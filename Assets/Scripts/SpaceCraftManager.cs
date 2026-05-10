@@ -11,6 +11,7 @@ public class SpaceCraftManager : MonoBehaviour
     public CameraManager cManager;
 
     private MovementData currentMovementData;
+    private bool wasBrowsing = false;
 
     void Awake()
     {
@@ -36,7 +37,32 @@ public class SpaceCraftManager : MonoBehaviour
         }
 
         sController.SetInputs(input.strafeInput, input.thrustInput, input.yawInput);
-        sController.SetMouseInput(input.mouseInput);
+
+        // Handle browse (look-around) mode: when browsing, update camera and keep ship mouse centered
+        if (cManager != null && input.isBrowsing)
+        {
+            if (!wasBrowsing)
+            {
+                cManager.StartBrowse();
+                wasBrowsing = true;
+            }
+
+            cManager.UpdateBrowse(input.mouseInput);
+
+            // Keep ship mouse input near screen center so ship doesn't react to mouse while browsing
+            Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            sController.SetMouseInput(screenCenter);
+        }
+        else
+        {
+            if (wasBrowsing)
+            {
+                if (cManager != null) cManager.StopBrowse();
+                wasBrowsing = false;
+            }
+
+            sController.SetMouseInput(input.mouseInput);
+        }
     }
 
     public void OnMovementUpdated(float desiredThrust, float actualThrust, Vector3 velocity, Vector3 angularVelocity)

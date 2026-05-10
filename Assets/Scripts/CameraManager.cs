@@ -14,10 +14,19 @@ public class CameraManager : MonoBehaviour
     private Vector3 baseLocalPosition;
     private Coroutine shakeRoutine;
     private float currentShakeIntensity;
+    // Browse (look-around) state
+    [SerializeField] private float browseMaxAngle = 90f;
+    [SerializeField] private float browseSmoothing = 8f;
+    [SerializeField] private float browseReturnSpeed = 6f;
+    private bool isBrowsing = false;
+    private Quaternion baseLocalRotationQ;
+    private Quaternion targetLocalRotation;
 
     void Awake()
     {
         baseLocalPosition = transform.localPosition;
+        baseLocalRotationQ = transform.localRotation;
+        targetLocalRotation = baseLocalRotationQ;
     }
 
     public void OnThrustChanged(float actualThrust, float desiredThrust)
@@ -72,6 +81,53 @@ public class CameraManager : MonoBehaviour
             ) * 0.01f;
 
             yield return new WaitForSeconds(sampleInterval);
+        }
+    }
+
+    // Called when entering browse (look-around) mode
+    public void StartBrowse()
+    {
+        isBrowsing = true;
+        // initialize target to current so transition is smooth
+        baseLocalRotationQ = transform.localRotation;
+        targetLocalRotation = baseLocalRotationQ;
+    }
+
+    // Called when exiting browse mode
+    public void StopBrowse()
+    {
+        isBrowsing = false;
+        targetLocalRotation = baseLocalRotationQ;
+    }
+
+    // Update browse orientation based on absolute mouse position
+    public void UpdateBrowse(Vector2 mousePosition)
+    {
+        if (!isBrowsing) return;
+
+        Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        Vector2 offset = mousePosition - screenCenter;
+
+        float nx = 0f;
+        float ny = 0f;
+        if (Mathf.Abs(screenCenter.x) > 0.0001f) nx = offset.x / screenCenter.x; // -1..1
+        if (Mathf.Abs(screenCenter.y) > 0.0001f) ny = offset.y / screenCenter.y; // -1..1
+
+        float yaw = Mathf.Clamp(nx * browseMaxAngle, -browseMaxAngle, browseMaxAngle);
+        float pitch = Mathf.Clamp(-ny * browseMaxAngle, -browseMaxAngle, browseMaxAngle);
+
+        Quaternion browseRotation = Quaternion.Euler(pitch, yaw, 0f);
+        targetLocalRotation = baseLocalRotationQ * browseRotation;
+
+        transform.localRotation = Quaternion.Slerp(transform.localRotation, targetLocalRotation, Time.deltaTime * browseSmoothing);
+    }
+
+    void LateUpdate()
+    {
+        if (!isBrowsing)
+        {
+            // smoothly return to base rotation when not browsing
+            transform.localRotation = Quaternion.Slerp(transform.localRotation, baseLocalRotationQ, Time.deltaTime * browseReturnSpeed);
         }
     }
 }
