@@ -24,8 +24,6 @@ public class ShipUIManager : MonoBehaviour
         float actualThrust = CurrentActualThrust;
         float desiredThrust = currentMovementData.desiredThrust;
 
-        Debug.Log($"Speed: {speed:F2}, ActualThrust: {actualThrust:F2}, DesiredThrust: {desiredThrust:F2}");
-
         // Bind text, sliders, or other UI elements here when they are added.
     }
 }

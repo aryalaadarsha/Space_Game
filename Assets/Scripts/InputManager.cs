@@ -22,6 +22,7 @@ public class InputManager : MonoBehaviour
     void OnEnable() => controls.Player.Enable();
     void OnDisable() => controls.Player.Disable();
 
+
     void Update()
     {
         inputData.thrustInput = (int) controls.Player.Thrust.ReadValue<float>();

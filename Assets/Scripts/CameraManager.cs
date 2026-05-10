@@ -8,8 +8,8 @@ using System.Collections;
 public class CameraManager : MonoBehaviour
 {
     [SerializeField] private float camShakeIntensityModifier = 100f;
-    [SerializeField] private float camShakeThreshold = 0.2f;
-    [SerializeField] private float camShakeFrequency = 10f;
+    [SerializeField] private float camShakeThreshold = 100f;
+    [SerializeField] private float camShakeInterval = 1f;
 
     private Vector3 baseLocalPosition;
     private Coroutine shakeRoutine;
@@ -22,19 +22,18 @@ public class CameraManager : MonoBehaviour
 
     public void OnThrustChanged(float actualThrust, float desiredThrust)
     {
-        float thrustDifference = desiredThrust - actualThrust;
-        thrustDifference *= camShakeIntensityModifier;
-        // Implement camera effects based on thrust changes, such as shaking
-        Debug.Log($"Camera Shake Intensity : {thrustDifference:F2}");
-        
+        float thrustDifference = Mathf.Abs(desiredThrust - actualThrust);
+        float shakeIntensity = thrustDifference;
 
-        if (thrustDifference > camShakeThreshold)
+        if (shakeIntensity > camShakeThreshold)
         {
-            StartShake(thrustDifference);
+            StartShake(shakeIntensity * camShakeIntensityModifier);
+            Debug.Log($"Thrust changed: Actual={actualThrust:F2}, Desired={desiredThrust:F2}, ShakeIntensity={shakeIntensity:F2}");
         }
         else
         {
             StopShake();
+            Debug.Log($"Thrust changed: Actual={actualThrust:F2}, Desired={desiredThrust:F2}, No shake (intensity {shakeIntensity:F2} below threshold)");
         }
     }
 
@@ -61,7 +60,8 @@ public class CameraManager : MonoBehaviour
 
     private IEnumerator ShakeCamera()
     {
-        float sampleInterval = camShakeFrequency <= 0.0001f ? 0.05f : 1f / camShakeFrequency;
+        Debug.Log($"Camera shake coroutine started with intensity: {currentShakeIntensity}");
+        float sampleInterval = camShakeInterval <= 0.0001f ? 0.05f : camShakeInterval;
 
         while (true)
         {
@@ -69,7 +69,7 @@ public class CameraManager : MonoBehaviour
                 Random.Range(-currentShakeIntensity, currentShakeIntensity),
                 Random.Range(-currentShakeIntensity, currentShakeIntensity),
                 0f
-            );
+            ) * 0.01f;
 
             yield return new WaitForSeconds(sampleInterval);
         }

@@ -784,9 +784,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a78379f7ded97e54a88dcce9da2d0180, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraManager
-  camShakeIntensityModifier: 1000
-  camShakeThreshold: 0.1
-  camShakeFrequency: 1
+  camShakeIntensityModifier: 0.012
+  camShakeThreshold: 7
+  camShakeInterval: 0.01
 --- !u!1 &983984896
 GameObject:
   m_ObjectHideFlags: 0
@@ -859,7 +859,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CameraManager
   camShakeIntensityModifier: 100
   camShakeThreshold: 0.2
-  camShakeFrequency: 20
+  camShakeInterval: 1
 --- !u!1 &1010070483
 GameObject:
   m_ObjectHideFlags: 0
@@ -937,7 +937,7 @@ MonoBehaviour:
   inputManager: {fileID: 983984899}
   sController: {fileID: 828377127}
   sUIManager: {fileID: 983984898}
-  cManager: {fileID: 0}
+  cManager: {fileID: 938913474}
 --- !u!1001 &1139821435
 PrefabInstance:
   m_ObjectHideFlags: 0
