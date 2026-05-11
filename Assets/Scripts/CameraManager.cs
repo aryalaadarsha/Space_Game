@@ -37,12 +37,12 @@ public class CameraManager : MonoBehaviour
         if (shakeIntensity > camShakeThreshold)
         {
             StartShake(shakeIntensity * camShakeIntensityModifier);
-            Debug.Log($"Thrust changed: Actual={actualThrust:F2}, Desired={desiredThrust:F2}, ShakeIntensity={shakeIntensity:F2}");
+            // Debug.Log($"Thrust changed: Actual={actualThrust:F2}, Desired={desiredThrust:F2}, ShakeIntensity={shakeIntensity:F2}");
         }
         else
         {
             StopShake();
-            Debug.Log($"Thrust changed: Actual={actualThrust:F2}, Desired={desiredThrust:F2}, No shake (intensity {shakeIntensity:F2} below threshold)");
+            // Debug.Log($"Thrust changed: Actual={actualThrust:F2}, Desired={desiredThrust:F2}, No shake (intensity {shakeIntensity:F2} below threshold)");
         }
     }
 
