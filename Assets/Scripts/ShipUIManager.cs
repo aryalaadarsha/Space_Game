@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -12,6 +13,9 @@ public class ShipUIManager : MonoBehaviour
     public Vector3 CurrentVelocity => currentMovementData.velocity;
     public Vector3 CurrentAngularVelocity => currentMovementData.angularVelocity;
 
+    [SerializeField] private TMP_Text desiredThrustText;
+    [SerializeField] private TMP_Text actualThrustText;
+
     public void ReceiveMovementData(MovementData movementData)
     {
         currentMovementData = movementData;
@@ -23,6 +27,9 @@ public class ShipUIManager : MonoBehaviour
         float speed = CurrentSpeed;
         float actualThrust = CurrentActualThrust;
         float desiredThrust = currentMovementData.desiredThrust;
+
+        desiredThrustText.text = $"{desiredThrust:F2}";
+        actualThrustText.text = $"{actualThrust:F2}";
 
         // Bind text, sliders, or other UI elements here when they are added.
     }

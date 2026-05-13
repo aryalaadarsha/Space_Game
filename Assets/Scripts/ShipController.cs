@@ -13,15 +13,15 @@ public class ShipController : MonoBehaviour
     private const int INIT_FRAMES = 3;
 
     [Header("Engine Settings")]
-    private float thrustForce = 1f;
-    private float thrustLerpSpeed = 0.5f;
-    private float strafeForce = 30f;
-    private float rotationSpeed = 0.5f;
-    private float mouseSensitivity = 0.005f;
+    [SerializeField] private float thrustForce = 1f;
+    [SerializeField] private float thrustLerpSpeed = 0.5f;
+    [SerializeField] private float strafeForce = 30f;
+    [SerializeField] private float rotationSpeed = 0.5f;
+    [SerializeField] private float mouseSensitivity = 0.005f;
 
     [Header("Mouse Snap Settings")]
-    [Range(0f, 0.5f)] public float snapZoneRadius = 0.04f;
-    [Range(0f, 20f)] public float snapStrength = 5f;
+    [Range(0f, 0.5f)] [SerializeField] private float snapZoneRadius = 0.04f;
+    [Range(0f, 20f)] [SerializeField] private float snapStrength = 5f;
 
     private Rigidbody rb;
     private SpaceCraftManager SCM;

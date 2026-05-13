@@ -13,5 +13,5 @@ AssetOrigin:
   productId: 153363
   packageName: Hi-Rez Sci-Fi Spaceships Creator Free Sample
   packageVersion: 1.31
-  assetPath: Assets/HiRezSpaceshipsCreatorFree/Prefabs/Modules/Cockpit3_WithoutInterior.prefab
+  assetPath: Assets/Packages/HiRezSpaceshipsCreatorFree/Prefabs/Modules/Cockpit3_WithoutInterior.prefab
   uploadId: 626481
