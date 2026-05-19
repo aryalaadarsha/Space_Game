@@ -21,7 +21,7 @@ public class ShipController : MonoBehaviour
 
     [Header("Mouse Snap Settings")]
     [Range(0f, 0.5f)] [SerializeField] private float snapZoneRadius = 0.04f;
-    [Range(0f, 20f)] [SerializeField] private float snapStrength = 5f;
+    // [Range(0f, 20f)] [SerializeField] private float snapStrength = 5f;
 
     private Rigidbody rb;
     private SpaceCraftManager SCM;
@@ -113,11 +113,11 @@ public class ShipController : MonoBehaviour
 
         if (distanceToCenter < snapZoneRadius)
         {
-            if (distanceToCenter > 0.0001f)
-            {
-                Vector2 snappedPos = Vector2.Lerp(mouseInput, screenCenter2, Time.fixedDeltaTime * snapStrength);
-                UnityEngine.InputSystem.Mouse.current.WarpCursorPosition(snappedPos);
-            }
+            // if (distanceToCenter > 0.0001f)
+            // {
+            //     Vector2 snappedPos = Vector2.Lerp(mouseInput, screenCenter2, Time.fixedDeltaTime * snapStrength);
+            //     UnityEngine.InputSystem.Mouse.current.WarpCursorPosition(snappedPos);
+            // }
             return Vector2.zero;
         }
 

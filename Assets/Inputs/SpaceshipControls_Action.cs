@@ -769,6 +769,42 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Attack_Left"",
+                    ""type"": ""Button"",
+                    ""id"": ""dc6e5f6b-db48-4cad-954e-2e861dba0c36"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Attack_Right"",
+                    ""type"": ""Button"",
+                    ""id"": ""c1a126ca-2971-4cb1-a2d3-eea91a08f2da"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Toggle_Weapon"",
+                    ""type"": ""Button"",
+                    ""id"": ""1ca8d1b5-32a4-4aa4-9642-831285ae9cad"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""HyperDrive"",
+                    ""type"": ""Button"",
+                    ""id"": ""c7f0c658-52d8-43a5-b3c4-fb6cb35c4fd2"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -925,6 +961,61 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
                     ""action"": ""Browse"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""842c450b-df33-40fd-96a5-95632e584a22"",
+                    ""path"": ""<Mouse>/leftButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Attack_Left"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b2d7c11e-234e-4575-bda2-97227914a1b7"",
+                    ""path"": ""<Mouse>/rightButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Attack_Right"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8b860871-ae77-4c63-a388-01dbca5922b2"",
+                    ""path"": ""<Keyboard>/u"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Toggle_Weapon"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b61100cc-c849-4d97-8b19-414ccff492ee"",
+                    ""path"": """",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""HyperDrive"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7d727d80-c0a6-4b63-800a-783763674bc0"",
+                    ""path"": ""<Keyboard>/j"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""HyperDrive"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -1019,6 +1110,10 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
         m_Player_Rotation = m_Player.FindAction("Rotation", throwIfNotFound: true);
         m_Player_Stop = m_Player.FindAction("Stop", throwIfNotFound: true);
         m_Player_Browse = m_Player.FindAction("Browse", throwIfNotFound: true);
+        m_Player_Attack_Left = m_Player.FindAction("Attack_Left", throwIfNotFound: true);
+        m_Player_Attack_Right = m_Player.FindAction("Attack_Right", throwIfNotFound: true);
+        m_Player_Toggle_Weapon = m_Player.FindAction("Toggle_Weapon", throwIfNotFound: true);
+        m_Player_HyperDrive = m_Player.FindAction("HyperDrive", throwIfNotFound: true);
     }
 
     ~@SpaceshipControls_Action()
@@ -1442,6 +1537,10 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
     private readonly InputAction m_Player_Rotation;
     private readonly InputAction m_Player_Stop;
     private readonly InputAction m_Player_Browse;
+    private readonly InputAction m_Player_Attack_Left;
+    private readonly InputAction m_Player_Attack_Right;
+    private readonly InputAction m_Player_Toggle_Weapon;
+    private readonly InputAction m_Player_HyperDrive;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1477,6 +1576,22 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
         /// Provides access to the underlying input action "Player/Browse".
         /// </summary>
         public InputAction @Browse => m_Wrapper.m_Player_Browse;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Attack_Left".
+        /// </summary>
+        public InputAction @Attack_Left => m_Wrapper.m_Player_Attack_Left;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Attack_Right".
+        /// </summary>
+        public InputAction @Attack_Right => m_Wrapper.m_Player_Attack_Right;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Toggle_Weapon".
+        /// </summary>
+        public InputAction @Toggle_Weapon => m_Wrapper.m_Player_Toggle_Weapon;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/HyperDrive".
+        /// </summary>
+        public InputAction @HyperDrive => m_Wrapper.m_Player_HyperDrive;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1521,6 +1636,18 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
             @Browse.started += instance.OnBrowse;
             @Browse.performed += instance.OnBrowse;
             @Browse.canceled += instance.OnBrowse;
+            @Attack_Left.started += instance.OnAttack_Left;
+            @Attack_Left.performed += instance.OnAttack_Left;
+            @Attack_Left.canceled += instance.OnAttack_Left;
+            @Attack_Right.started += instance.OnAttack_Right;
+            @Attack_Right.performed += instance.OnAttack_Right;
+            @Attack_Right.canceled += instance.OnAttack_Right;
+            @Toggle_Weapon.started += instance.OnToggle_Weapon;
+            @Toggle_Weapon.performed += instance.OnToggle_Weapon;
+            @Toggle_Weapon.canceled += instance.OnToggle_Weapon;
+            @HyperDrive.started += instance.OnHyperDrive;
+            @HyperDrive.performed += instance.OnHyperDrive;
+            @HyperDrive.canceled += instance.OnHyperDrive;
         }
 
         /// <summary>
@@ -1550,6 +1677,18 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
             @Browse.started -= instance.OnBrowse;
             @Browse.performed -= instance.OnBrowse;
             @Browse.canceled -= instance.OnBrowse;
+            @Attack_Left.started -= instance.OnAttack_Left;
+            @Attack_Left.performed -= instance.OnAttack_Left;
+            @Attack_Left.canceled -= instance.OnAttack_Left;
+            @Attack_Right.started -= instance.OnAttack_Right;
+            @Attack_Right.performed -= instance.OnAttack_Right;
+            @Attack_Right.canceled -= instance.OnAttack_Right;
+            @Toggle_Weapon.started -= instance.OnToggle_Weapon;
+            @Toggle_Weapon.performed -= instance.OnToggle_Weapon;
+            @Toggle_Weapon.canceled -= instance.OnToggle_Weapon;
+            @HyperDrive.started -= instance.OnHyperDrive;
+            @HyperDrive.performed -= instance.OnHyperDrive;
+            @HyperDrive.canceled -= instance.OnHyperDrive;
         }
 
         /// <summary>
@@ -1818,5 +1957,33 @@ public partial class @SpaceshipControls_Action: IInputActionCollection2, IDispos
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnBrowse(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Attack_Left" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnAttack_Left(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Attack_Right" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnAttack_Right(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Toggle_Weapon" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnToggle_Weapon(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "HyperDrive" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnHyperDrive(InputAction.CallbackContext context);
     }
 }

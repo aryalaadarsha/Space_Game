@@ -135,11 +135,7 @@ public class SpaceshipController : MonoBehaviour
 
         if (distanceToCenter < snapZoneRadius)
         {
-            if (distanceToCenter > 0.0001f)
-            {
-                Vector2 snappedPos = Vector2.Lerp(mouseInput, screenCenter2, Time.fixedDeltaTime * snapStrength);
-                Mouse.current.WarpCursorPosition(snappedPos);
-            }
+            // snap 존 안에서는 마우스 포인터를 끌지 않고, 회전에만 영향을 주지 않음
             return Vector2.zero;
         }
 

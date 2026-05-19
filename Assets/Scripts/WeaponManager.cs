@@ -13,10 +13,48 @@ public class WeaponManager : MonoBehaviour
     [SerializeField] private float rattleFrequency = 18f;
     [SerializeField] private float settleTime = 0.18f;
     [SerializeField] private float settleDamping = 12f;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
+    private bool isWeaponToggling = false;
+    private bool isWeaponReleased = false;
     void Start()
     {
-        ReleaseWeapon();
+        // ReleaseWeapon();
+    }
+
+    public void ToggleWeapon()
+    {
+        if (isWeaponToggling)
+        {
+            return;
+        }
+
+        isWeaponToggling = true;
+
+        if (isWeaponReleased)
+        {
+            StartCoroutine(RetractWeaponAnim());
+        }
+        else
+        {
+            StartCoroutine(ReleaseWeaponAnim());
+        }
+        isWeaponReleased = !isWeaponReleased;
+    }
+
+    public void FireWeapon(bool isLeft, bool isRight)
+    {
+        if (!isWeaponReleased) return;
+
+        if (isLeft)
+        {          
+            Debug.Log("Fire Left Weapon");
+            // weaponObj1.GetComponent<Renderer>().material.color = Color.red;
+        }
+        if (isRight)
+        {  
+            Debug.Log("Fire Right Weapon");
+            // weaponObj2.GetComponent<Renderer>().material.color = Color.red;
+        }
     }
 
     private void ReleaseWeapon()
@@ -27,11 +65,13 @@ public class WeaponManager : MonoBehaviour
     private IEnumerator ReleaseWeaponAnim()
     {
         yield return AnimateWeapon(Vector3.zero, releaseLength * Vector3.forward);
+        isWeaponToggling = false;
     }
 
     private IEnumerator RetractWeaponAnim()
     {
         yield return AnimateWeapon(releaseLength * Vector3.forward, Vector3.zero);
+        isWeaponToggling = false;
     }
 
     private IEnumerator AnimateWeapon(Vector3 startPos, Vector3 endPos)
@@ -72,4 +112,5 @@ public class WeaponManager : MonoBehaviour
         float x = t - 1f;
         return 1f + (strength + 1f) * x * x * x + strength * x * x;
     }
+
 }

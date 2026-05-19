@@ -9,6 +9,8 @@ public class SpaceCraftManager : MonoBehaviour
     public ShipController sController;
     public ShipUIManager sUIManager;
     public CameraManager cManager;
+    public WeaponManager wManager;
+    public HyperDriveManager hManager;
 
     private MovementData currentMovementData;
     private bool wasBrowsing = false;
@@ -19,6 +21,8 @@ public class SpaceCraftManager : MonoBehaviour
         if (sController == null)  sController = GetComponentInChildren<ShipController>();
         if (sUIManager == null)   sUIManager = GetComponentInChildren<ShipUIManager>  ();
         if (cManager == null)     cManager = GetComponentInChildren<CameraManager>    ();
+        if (wManager == null)     wManager = GetComponentInChildren<WeaponManager>    ();
+        if (hManager == null)     hManager = GetComponentInChildren<HyperDriveManager>       ();
     }
 
     void Update()
@@ -30,15 +34,30 @@ public class SpaceCraftManager : MonoBehaviour
     private void ProcessInput()
     {
         InputData input = inputManager.inputData;
-
-        if (input.stopTrigger)
-        {
-            sController.ResetThrust();
-        }
-
-        sController.SetInputs(input.strafeInput, input.thrustInput, input.yawInput);
+        HandleStopTrigger(input);
+        HandleSetInputs(input);
 
         // Handle browse (look-around) mode: when browsing, update camera and keep ship mouse centered
+        HandleBrowsing(input);
+        HandleCameraLook(input);
+        HandleToggleWeapon(input);
+        HandleFireWeapons(input);
+        HandleHyperDrive(input);
+    }
+
+    private void HandleToggleWeapon(InputData input)
+    {
+        if (input.toggleWeapon)
+        {
+            if (wManager != null)
+            {
+                wManager.ToggleWeapon();
+            }
+        }
+    }
+
+    private void HandleBrowsing(InputData input)
+    {
         if (cManager != null && input.isBrowsing)
         {
             if (!wasBrowsing)
@@ -65,6 +84,35 @@ public class SpaceCraftManager : MonoBehaviour
         }
     }
 
+    private void HandleCameraLook(InputData input)
+    {
+        if (cManager != null)
+        {
+            cManager.UpdateCameraLook(input.cameraLookInput);
+        }
+    }
+
+    private void HandleSetInputs(InputData input)
+    {
+        sController.SetInputs(input.strafeInput, input.thrustInput, input.yawInput);
+    }
+
+    private void HandleStopTrigger(InputData input)
+    {
+        if (input.stopTrigger)
+        {
+            sController.ResetThrust();
+        }
+    }
+
+    private void HandleFireWeapons(InputData input)
+    {
+        if (wManager != null)
+        {
+            wManager.FireWeapon(input.fireLeftWeapon, input.fireRightWeapon);
+        }
+    }
+
     public void OnMovementUpdated(float desiredThrust, float actualThrust, Vector3 velocity, Vector3 angularVelocity)
     {
         currentMovementData.desiredThrust = desiredThrust;
@@ -79,6 +127,21 @@ public class SpaceCraftManager : MonoBehaviour
         if (cManager != null)
         {
             cManager.OnThrustChanged(actualThrust, desiredThrust);
+        }
+    }
+
+    private void HandleHyperDrive(InputData input)
+    {
+        if (input.hyperDriveTrigger)
+        {
+            OnHyperDriveActivated();
+        }
+    }
+    private void OnHyperDriveActivated()
+    {
+        if (hManager != null)
+        {
+            hManager.ActivateHyperDrive();
         }
     }
 }
