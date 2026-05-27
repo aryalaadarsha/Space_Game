@@ -1,11 +1,14 @@
 using System.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class HyperDriveManager : MonoBehaviour
 {
     [SerializeField] private float hyperDriveChargeTime = 6f;
     [SerializeField] private float hyperDriveDuration = 5f;
+
+    [SerializeField] private string NextSceneName = "SampleScene2"; // HyperDrive 후 로드할 씬 이름
     // HyperDrive 관련 로직을 여기에 구현
     public void ActivateHyperDrive()
     {
@@ -41,6 +44,8 @@ public class HyperDriveManager : MonoBehaviour
     {
         // HyperDrive 종료 로직
         Debug.Log("Exiting HyperDrive...");
+        
+        SceneManager.LoadScene(NextSceneName);
         yield return null;
     }
 }

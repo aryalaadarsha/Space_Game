@@ -22,7 +22,9 @@ public class SpaceCraftManager : MonoBehaviour
         if (sUIManager == null)   sUIManager = GetComponentInChildren<ShipUIManager>  ();
         if (cManager == null)     cManager = GetComponentInChildren<CameraManager>    ();
         if (wManager == null)     wManager = GetComponentInChildren<WeaponManager>    ();
-        if (hManager == null)     hManager = GetComponentInChildren<HyperDriveManager>       ();
+        if (hManager == null)     hManager = GetComponentInChildren<HyperDriveManager>();
+
+        DontDestroyOnLoad(gameObject);
     }
 
     void Update()
