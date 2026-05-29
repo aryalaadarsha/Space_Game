@@ -145,4 +145,9 @@ public class ShipController : MonoBehaviour
             SCM.OnMovementUpdated(desiredThrust, actualThrust, rb.linearVelocity, rb.angularVelocity);
         }
     }
+
+    public void ModifyThrustForce(float amount)
+    {
+        thrustForce *= amount;
+    }
 }
