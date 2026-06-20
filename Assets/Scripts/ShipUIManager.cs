@@ -15,6 +15,8 @@ public class ShipUIManager : MonoBehaviour
 
     [SerializeField] private TMP_Text desiredThrustText;
     [SerializeField] private TMP_Text actualThrustText;
+    [SerializeField] private HologramThrustGauge desiredThrustGauge;
+    [SerializeField] private HologramThrustGauge actualThrustGauge;
 
     public void ReceiveMovementData(MovementData movementData)
     {
@@ -28,9 +30,24 @@ public class ShipUIManager : MonoBehaviour
         float actualThrust = CurrentActualThrust;
         float desiredThrust = currentMovementData.desiredThrust;
 
-        desiredThrustText.text = $"{desiredThrust:F2}";
-        actualThrustText.text = $"{actualThrust:F2}";
+        if (desiredThrustText != null)
+        {
+            desiredThrustText.text = $"{desiredThrust:F2}";
+        }
 
-        // Bind text, sliders, or other UI elements here when they are added.
+        if (actualThrustText != null)
+        {
+            actualThrustText.text = $"{actualThrust:F2}";
+        }
+
+        if (desiredThrustGauge != null)
+        {
+            desiredThrustGauge.SetValue(desiredThrust);
+        }
+
+        if (actualThrustGauge != null)
+        {
+            actualThrustGauge.SetValue(actualThrust);
+        }
     }
 }

@@ -23,8 +23,14 @@ public class ShipController : MonoBehaviour
     [Range(0f, 0.5f)] [SerializeField] private float snapZoneRadius = 0.04f;
     // [Range(0f, 20f)] [SerializeField] private float snapStrength = 5f;
 
+    [Header("Target Lock Settings")]
+    [SerializeField] private float lockTurnSpeed = 80f;
+    [SerializeField] private float lockAngularDamping = 8f;
+
     private Rigidbody rb;
     private SpaceCraftManager SCM;
+    private bool hasNavigationLock;
+    private Vector3 navigationLockDirection;
 
     private float actualThrust = 0f;
     private Vector2 moveInput;
@@ -61,12 +67,38 @@ public class ShipController : MonoBehaviour
     {
         desiredThrust = 0f;
     }
+
+    public void SetNavigationLock(Transform target)
+    {
+        hasNavigationLock = target != null;
+        if (target != null)
+        {
+            navigationLockDirection = (target.position - transform.position).normalized;
+        }
+    }
+
+    public void SetNavigationLockDirection(bool isLocked, Vector3 worldDirection)
+    {
+        hasNavigationLock = isLocked && worldDirection.sqrMagnitude > 0.0001f;
+        if (hasNavigationLock)
+        {
+            navigationLockDirection = worldDirection.normalized;
+        }
+    }
+
     void FixedUpdate()
     {
         UpdateThrust();
         ApplyTranslation();
-        Vector2 processedRotation = HandleShipMouseControl();
-        ApplyRotation(processedRotation);
+        if (hasNavigationLock)
+        {
+            ApplyNavigationLockRotation();
+        }
+        else
+        {
+            Vector2 processedRotation = HandleShipMouseControl();
+            ApplyRotation(processedRotation);
+        }
 
         AfterMovement();
     }
@@ -136,6 +168,22 @@ public class ShipController : MonoBehaviour
         Vector3 torque = new Vector3(pitch, yaw, roll) * rotationSpeed * Time.fixedDeltaTime;
         rb.AddRelativeTorque(torque, ForceMode.VelocityChange);
         rb.angularVelocity = Vector3.ClampMagnitude(rb.angularVelocity, 1f);
+    }
+
+    private void ApplyNavigationLockRotation()
+    {
+        if (navigationLockDirection.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        Vector3 direction = navigationLockDirection.normalized;
+        Vector3 up = Mathf.Abs(Vector3.Dot(direction, Vector3.up)) > 0.98f ? transform.up : Vector3.up;
+        Quaternion targetRotation = Quaternion.LookRotation(direction, up);
+        Quaternion nextRotation = Quaternion.RotateTowards(rb.rotation, targetRotation, lockTurnSpeed * Time.fixedDeltaTime);
+
+        rb.MoveRotation(nextRotation);
+        rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, lockAngularDamping * Time.fixedDeltaTime);
     }
 
     private void AfterMovement()
