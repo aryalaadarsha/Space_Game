@@ -226,8 +226,22 @@ public class TargetingManager : MonoBehaviour
         {
             if (target != null && target.activeInHierarchy)
             {
-                targetCandidates.Add(target.transform);
+                AddTargetCandidate(target.transform);
             }
+        }
+
+        UpdateHyperDriveReference();
+        if (hyperDriveManager != null)
+        {
+            hyperDriveManager.AddDestinationTargets(targetCandidates);
+        }
+    }
+
+    private void AddTargetCandidate(Transform target)
+    {
+        if (target != null && target.gameObject.activeInHierarchy && !targetCandidates.Contains(target))
+        {
+            targetCandidates.Add(target);
         }
     }
 

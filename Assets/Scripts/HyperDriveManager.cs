@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
@@ -59,6 +60,25 @@ public class HyperDriveManager : MonoBehaviour
     [SerializeField] private string farSpaceLayerName = "FarSpace";
     [SerializeField] private string trackingTargetTag = "TrackingObject";
 
+    [Header("Hyper Cruise Warning Light")]
+    [SerializeField] private Light hyperCruiseSpotLight;
+    [SerializeField] private string hyperCruiseSpotLightPath = "Player/SpaceCraft/Spot Light";
+    [SerializeField] private float warningLightMinIntensity = 0.25f;
+    [SerializeField] private float warningLightMaxIntensity = 9.5f;
+    [SerializeField] private float warningLightFlickerSpeed = 11f;
+    [SerializeField] private float warningLightPulseSpeed = 3.25f;
+    [SerializeField] private int warningBeaconCount = 3;
+    [SerializeField] private float warningBeaconScale = 2.25f;
+    [SerializeField] private float warningBeaconSpacing = 3.2f;
+
+    [Header("Combat Encounter")]
+    [SerializeField] private GameObject combatEnemyPrefab;
+    [SerializeField] private int combatEnemyCount = 1;
+    [SerializeField] private float combatSpawnForwardOffset = 360f;
+    [SerializeField] private float combatSpawnRightOffset = 120f;
+    [SerializeField] private float combatSpawnUpOffset = 45f;
+    [SerializeField] private float combatSpawnSpread = 70f;
+
     private readonly List<Button> destinationButtons = new List<Button>();
     private readonly List<TMP_Text> destinationLabels = new List<TMP_Text>();
     private readonly List<TMP_Text> destinationMetaLabels = new List<TMP_Text>();
@@ -76,6 +96,15 @@ public class HyperDriveManager : MonoBehaviour
     private Image warpFillImage;
     private TMP_Text warpGaugeText;
     private TMP_Text warpStatusText;
+
+    private Coroutine hyperCruiseSpotLightRoutine;
+    private bool spotLightOriginalActiveSelf;
+    private bool spotLightOriginalEnabled;
+    private float spotLightOriginalIntensity;
+    private Color spotLightOriginalColor;
+    private bool spotLightStateCaptured;
+    private readonly List<Renderer> warningBeaconRenderers = new List<Renderer>();
+    private Material warningBeaconMaterial;
 
     private static readonly Color NeonOrange = new Color(1f, 0.43f, 0.02f, 1f);
     private static readonly Color DimOrange = new Color(1f, 0.24f, 0f, 0.36f);
@@ -115,12 +144,17 @@ public class HyperDriveManager : MonoBehaviour
         RefreshHud();
     }
 
+    private void OnDisable()
+    {
+        StopHyperCruiseSpotLightEffect(true);
+    }
+
     public void ActivateHyperDrive()
     {
         TryStartHyperCruise();
     }
 
-    public bool TryStartHyperCruise()
+    public bool TryStartHyperCruise(bool requestCombatEncounter = false)
     {
         if (isJumping || !TryGetSelectedDestination(out HyperCruiseDestination destination))
         {
@@ -147,11 +181,15 @@ public class HyperDriveManager : MonoBehaviour
             return false;
         }
 
-        StartCoroutine(RunHyperCruiseRoutine(destination, target, cost));
+        StartCoroutine(RunHyperCruiseRoutine(destination, target, cost, requestCombatEncounter));
         return true;
     }
 
-    private IEnumerator RunHyperCruiseRoutine(HyperCruiseDestination destination, Transform target, float cost)
+    private IEnumerator RunHyperCruiseRoutine(
+        HyperCruiseDestination destination,
+        Transform target,
+        float cost,
+        bool requestCombatEncounter)
     {
         ShipController shipController = FindFirstObjectByType<ShipController>();
         if (shipController == null || target == null)
@@ -165,6 +203,7 @@ public class HyperDriveManager : MonoBehaviour
         SetStatus("HYPER CRUISE JUMP", NeonBlue);
         RefreshHud();
         ConfigureOutsideOnlyPostProcessing();
+        StartHyperCruiseSpotLightEffect();
 
         TargetingManager targetingManager = FindFirstObjectByType<TargetingManager>();
         if (targetingManager != null)
@@ -207,7 +246,17 @@ public class HyperDriveManager : MonoBehaviour
         StabilizeArrivalView(shipController, target);
         shipController.SetHyperCruiseOverrideActive(false);
         isJumping = false;
-        SetStatus("HYPER CRUISE READY", NeonOrange);
+        StopHyperCruiseSpotLightEffect(true);
+
+        if (requestCombatEncounter)
+        {
+            StartCombatEncounter(shipController);
+        }
+        else
+        {
+            SetStatus("HYPER CRUISE READY", NeonOrange);
+        }
+
         RefreshHud();
     }
 
@@ -235,6 +284,15 @@ public class HyperDriveManager : MonoBehaviour
             galacticCoordinates = new Vector3(74f, 8f, 39f),
             solarSystemPositionAu = new Vector3(9.58f, 0f, 0f),
             accentColor = new Color(1f, 0.55f, 0.08f, 1f)
+        });
+        destinations.Add(new HyperCruiseDestination
+        {
+            destinationName = "SUN",
+            sceneName = "Sun",
+            targetObjectName = "Sun",
+            galacticCoordinates = Vector3.zero,
+            solarSystemPositionAu = Vector3.zero,
+            accentColor = new Color(1f, 0.82f, 0.18f, 1f)
         });
     }
 
@@ -334,6 +392,11 @@ public class HyperDriveManager : MonoBehaviour
         }
 
         string normalizedName = NormalizeDestinationName(destination.destinationName);
+        if (normalizedName == "SUN")
+        {
+            return Vector3.zero;
+        }
+
         if (normalizedName == "EARTH")
         {
             return new Vector3(1f, 0f, 0f);
@@ -362,10 +425,15 @@ public class HyperDriveManager : MonoBehaviour
         RefreshHud();
     }
 
-    private void SelectAndStartDestination(int index)
+    private void SelectAndStartDestination(int index, bool requestCombatEncounter = false)
     {
         SelectDestination(index);
-        TryStartHyperCruise();
+        if (requestCombatEncounter)
+        {
+            SetStatus("COMBAT ROUTE LOCKED", new Color(1f, 0.18f, 0.04f, 1f));
+        }
+
+        TryStartHyperCruise(requestCombatEncounter);
     }
 
     private void EnsureHud()
@@ -440,6 +508,7 @@ public class HyperDriveManager : MonoBehaviour
         Button button = buttonObject.GetComponent<Button>();
         int destinationIndex = index;
         button.onClick.AddListener(() => SelectAndStartDestination(destinationIndex));
+        AddDestinationPointerEvents(buttonObject, destinationIndex);
         ColorBlock colors = button.colors;
         colors.normalColor = new Color(1f, 0.42f, 0f, 0.2f);
         colors.highlightedColor = new Color(1f, 0.55f, 0.08f, 0.42f);
@@ -626,6 +695,405 @@ public class HyperDriveManager : MonoBehaviour
 
         kilometers = GetDistanceKilometers(destination);
         return kilometers > 0.0;
+    }
+
+    public void AddDestinationTargets(List<Transform> targets)
+    {
+        if (targets == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < destinations.Count; i++)
+        {
+            Transform target = FindDestinationTarget(destinations[i]);
+            if (target != null && target.gameObject.activeInHierarchy && !targets.Contains(target))
+            {
+                targets.Add(target);
+            }
+        }
+    }
+
+    private void AddDestinationPointerEvents(GameObject buttonObject, int destinationIndex)
+    {
+        EventTrigger trigger = buttonObject.GetComponent<EventTrigger>();
+        if (trigger == null)
+        {
+            trigger = buttonObject.AddComponent<EventTrigger>();
+        }
+
+        EventTrigger.Entry clickEntry = new EventTrigger.Entry
+        {
+            eventID = EventTriggerType.PointerClick
+        };
+        clickEntry.callback.AddListener(eventData => HandleDestinationPointerClick(eventData, destinationIndex));
+        trigger.triggers.Add(clickEntry);
+    }
+
+    private void HandleDestinationPointerClick(BaseEventData eventData, int destinationIndex)
+    {
+        PointerEventData pointerEventData = eventData as PointerEventData;
+        if (pointerEventData == null || pointerEventData.button != PointerEventData.InputButton.Right)
+        {
+            return;
+        }
+
+        if (destinationIndex < 0 || destinationIndex >= destinationButtons.Count)
+        {
+            return;
+        }
+
+        Button button = destinationButtons[destinationIndex];
+        if (button == null || !button.interactable)
+        {
+            return;
+        }
+
+        SelectAndStartDestination(destinationIndex, true);
+    }
+
+    private void StartCombatEncounter(ShipController shipController)
+    {
+        if (shipController == null)
+        {
+            return;
+        }
+
+        int spawnCount = Mathf.Max(1, combatEnemyCount);
+        for (int i = 0; i < spawnCount; i++)
+        {
+            GameObject enemyObject = CreateCombatEnemyObject();
+            if (enemyObject == null)
+            {
+                continue;
+            }
+
+            Transform enemyTransform = enemyObject.transform;
+            Vector3 spawnPosition = GetCombatSpawnPosition(shipController.transform, i, spawnCount);
+            enemyTransform.position = spawnPosition;
+            Vector3 lookDirection = shipController.transform.position - spawnPosition;
+            if (lookDirection.sqrMagnitude > 0.0001f)
+            {
+                enemyTransform.rotation = Quaternion.LookRotation(lookDirection.normalized, shipController.transform.up);
+            }
+
+            Enemy enemy = enemyObject.GetComponent<Enemy>();
+            if (enemy == null)
+            {
+                enemy = enemyObject.AddComponent<Enemy>();
+            }
+
+            enemy.Initialize(shipController.transform.root);
+            enemyObject.SetActive(true);
+        }
+
+        SetStatus("COMBAT CONTACT", new Color(1f, 0.18f, 0.04f, 1f));
+    }
+
+    private GameObject CreateCombatEnemyObject()
+    {
+        if (combatEnemyPrefab != null)
+        {
+            return Instantiate(combatEnemyPrefab);
+        }
+
+        GameObject enemyObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        enemyObject.name = "Enemy";
+        enemyObject.transform.localScale = new Vector3(7f, 3f, 12f);
+
+        Rigidbody rigidbody = enemyObject.AddComponent<Rigidbody>();
+        rigidbody.useGravity = false;
+        rigidbody.linearDamping = 0.25f;
+        rigidbody.angularDamping = 1f;
+
+        enemyObject.AddComponent<Enemy>();
+        int nearSpaceLayer = LayerMask.NameToLayer("NearSpace");
+        if (nearSpaceLayer >= 0)
+        {
+            enemyObject.layer = nearSpaceLayer;
+        }
+
+        return enemyObject;
+    }
+
+    private Vector3 GetCombatSpawnPosition(Transform shipTransform, int index, int spawnCount)
+    {
+        Vector3 forward = shipTransform.forward.sqrMagnitude > 0.0001f ? shipTransform.forward.normalized : Vector3.forward;
+        Vector3 right = shipTransform.right.sqrMagnitude > 0.0001f ? shipTransform.right.normalized : Vector3.right;
+        Vector3 up = shipTransform.up.sqrMagnitude > 0.0001f ? shipTransform.up.normalized : Vector3.up;
+        float centeredIndex = index - (spawnCount - 1) * 0.5f;
+
+        return shipTransform.position
+            + forward * combatSpawnForwardOffset
+            + right * (combatSpawnRightOffset + centeredIndex * combatSpawnSpread)
+            + up * combatSpawnUpOffset;
+    }
+
+    private void StartHyperCruiseSpotLightEffect()
+    {
+        Light spotLight = FindHyperCruiseSpotLight();
+        if (spotLight == null)
+        {
+            return;
+        }
+
+        if (hyperCruiseSpotLightRoutine != null)
+        {
+            StopCoroutine(hyperCruiseSpotLightRoutine);
+        }
+
+        CaptureSpotLightState(spotLight);
+        spotLight.gameObject.SetActive(true);
+        spotLight.enabled = true;
+        EnsureWarningBeacons(spotLight.transform);
+        SetWarningBeaconsActive(true);
+        hyperCruiseSpotLightRoutine = StartCoroutine(AnimateHyperCruiseSpotLight(spotLight));
+    }
+
+    private void StopHyperCruiseSpotLightEffect(bool restoreOriginalState)
+    {
+        if (hyperCruiseSpotLightRoutine != null)
+        {
+            StopCoroutine(hyperCruiseSpotLightRoutine);
+            hyperCruiseSpotLightRoutine = null;
+        }
+
+        Light spotLight = hyperCruiseSpotLight != null ? hyperCruiseSpotLight : FindHyperCruiseSpotLight();
+        if (spotLight == null)
+        {
+            spotLightStateCaptured = false;
+            return;
+        }
+
+        if (restoreOriginalState && spotLightStateCaptured)
+        {
+            spotLight.intensity = spotLightOriginalIntensity;
+            spotLight.color = spotLightOriginalColor;
+            spotLight.enabled = spotLightOriginalEnabled;
+            SetWarningBeaconsActive(false);
+            spotLight.gameObject.SetActive(spotLightOriginalActiveSelf);
+        }
+        else
+        {
+            SetWarningBeaconsActive(false);
+            spotLight.enabled = false;
+            spotLight.gameObject.SetActive(false);
+        }
+
+        spotLightStateCaptured = false;
+    }
+
+    private void CaptureSpotLightState(Light spotLight)
+    {
+        if (spotLightStateCaptured || spotLight == null)
+        {
+            return;
+        }
+
+        spotLightOriginalActiveSelf = spotLight.gameObject.activeSelf;
+        spotLightOriginalEnabled = spotLight.enabled;
+        spotLightOriginalIntensity = spotLight.intensity;
+        spotLightOriginalColor = spotLight.color;
+        spotLightStateCaptured = true;
+    }
+
+    private IEnumerator AnimateHyperCruiseSpotLight(Light spotLight)
+    {
+        float minIntensity = Mathf.Max(0f, warningLightMinIntensity);
+        float maxIntensity = Mathf.Max(minIntensity, warningLightMaxIntensity);
+        float pulseSpeed = Mathf.Max(0.01f, warningLightPulseSpeed);
+        float flickerSpeed = Mathf.Max(0.01f, warningLightFlickerSpeed);
+        Color warningRed = new Color(1f, 0.02f, 0f, 1f);
+        Color hotAmber = new Color(1f, 0.46f, 0.08f, 1f);
+
+        while (spotLight != null)
+        {
+            float pulse = Mathf.InverseLerp(-1f, 1f, Mathf.Sin(Time.time * pulseSpeed));
+            float flicker = Mathf.PerlinNoise(Time.time * flickerSpeed, 0.37f);
+            float brightness = Mathf.Clamp01(pulse * 0.55f + flicker * 0.45f);
+
+            spotLight.intensity = Mathf.Lerp(minIntensity, maxIntensity, brightness);
+            spotLight.color = Color.Lerp(warningRed, hotAmber, flicker * 0.35f);
+            UpdateWarningBeacons(brightness, spotLight.color);
+
+            yield return null;
+        }
+    }
+
+    private void EnsureWarningBeacons(Transform parent)
+    {
+        if (parent == null || warningBeaconRenderers.Count > 0)
+        {
+            return;
+        }
+
+        warningBeaconMaterial = CreateWarningBeaconMaterial();
+        int beaconCount = Mathf.Max(1, warningBeaconCount);
+        float centerOffset = (beaconCount - 1) * 0.5f;
+        int nearSpaceLayer = LayerMask.NameToLayer("NearSpace");
+
+        for (int i = 0; i < beaconCount; i++)
+        {
+            GameObject beacon = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            beacon.name = $"Hyper Cruise Warning Beacon {i + 1:00}";
+            beacon.transform.SetParent(parent, false);
+            beacon.transform.localPosition = new Vector3((i - centerOffset) * warningBeaconSpacing, 0f, 0.35f);
+            beacon.transform.localRotation = Quaternion.identity;
+            beacon.transform.localScale = Vector3.one * warningBeaconScale;
+
+            if (nearSpaceLayer >= 0)
+            {
+                SetLayerRecursively(beacon, nearSpaceLayer);
+            }
+
+            Collider beaconCollider = beacon.GetComponent<Collider>();
+            if (beaconCollider != null)
+            {
+                Destroy(beaconCollider);
+            }
+
+            Renderer beaconRenderer = beacon.GetComponent<Renderer>();
+            if (beaconRenderer != null)
+            {
+                beaconRenderer.sharedMaterial = warningBeaconMaterial;
+                warningBeaconRenderers.Add(beaconRenderer);
+            }
+
+            beacon.SetActive(false);
+        }
+    }
+
+    private Material CreateWarningBeaconMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+        {
+            shader = Shader.Find("Unlit/Color");
+        }
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Standard");
+        }
+
+        Material material = new Material(shader)
+        {
+            name = "Runtime_HyperCruise_WarningBeacon"
+        };
+        ApplyWarningBeaconColor(material, new Color(1f, 0f, 0f, 1f));
+        return material;
+    }
+
+    private void SetWarningBeaconsActive(bool active)
+    {
+        for (int i = 0; i < warningBeaconRenderers.Count; i++)
+        {
+            Renderer beaconRenderer = warningBeaconRenderers[i];
+            if (beaconRenderer != null)
+            {
+                beaconRenderer.gameObject.SetActive(active);
+            }
+        }
+    }
+
+    private void UpdateWarningBeacons(float brightness, Color color)
+    {
+        float visibleBrightness = Mathf.Lerp(0.18f, 1f, Mathf.Clamp01(brightness));
+        Color beaconColor = color * visibleBrightness;
+        beaconColor.a = 1f;
+
+        if (warningBeaconMaterial != null)
+        {
+            ApplyWarningBeaconColor(warningBeaconMaterial, beaconColor);
+        }
+
+        float scale = warningBeaconScale * Mathf.Lerp(0.82f, 1.2f, visibleBrightness);
+        for (int i = 0; i < warningBeaconRenderers.Count; i++)
+        {
+            Renderer beaconRenderer = warningBeaconRenderers[i];
+            if (beaconRenderer != null)
+            {
+                beaconRenderer.transform.localScale = Vector3.one * scale;
+            }
+        }
+    }
+
+    private void ApplyWarningBeaconColor(Material material, Color color)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", color);
+        }
+
+        if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", color);
+        }
+
+        if (material.HasProperty("_EmissionColor"))
+        {
+            material.EnableKeyword("_EMISSION");
+            material.SetColor("_EmissionColor", color * 4f);
+        }
+    }
+
+    private void SetLayerRecursively(GameObject target, int layer)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        target.layer = layer;
+        for (int i = 0; i < target.transform.childCount; i++)
+        {
+            SetLayerRecursively(target.transform.GetChild(i).gameObject, layer);
+        }
+    }
+
+    private Light FindHyperCruiseSpotLight()
+    {
+        if (hyperCruiseSpotLight != null)
+        {
+            return hyperCruiseSpotLight;
+        }
+
+        Transform root = transform.root;
+        if (root != null && !string.IsNullOrWhiteSpace(hyperCruiseSpotLightPath))
+        {
+            string relativePath = hyperCruiseSpotLightPath;
+            string rootPrefix = root.name + "/";
+            if (relativePath.StartsWith(rootPrefix, System.StringComparison.Ordinal))
+            {
+                relativePath = relativePath.Substring(rootPrefix.Length);
+            }
+
+            Transform lightTransform = root.Find(relativePath);
+            if (lightTransform != null && lightTransform.TryGetComponent(out hyperCruiseSpotLight))
+            {
+                return hyperCruiseSpotLight;
+            }
+        }
+
+        Light[] candidateLights = root != null
+            ? root.GetComponentsInChildren<Light>(true)
+            : FindObjectsByType<Light>(FindObjectsSortMode.None);
+        for (int i = 0; i < candidateLights.Length; i++)
+        {
+            Light candidate = candidateLights[i];
+            if (candidate != null && candidate.name == "Spot Light")
+            {
+                hyperCruiseSpotLight = candidate;
+                return hyperCruiseSpotLight;
+            }
+        }
+
+        return null;
     }
 
     private void SetStatus(string status, Color color)
