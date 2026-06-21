@@ -23,6 +23,7 @@ public class TargetingManager : MonoBehaviour
     private readonly List<Transform> targetCandidates = new List<Transform>();
     private Transform currentTarget;
     private Transform lockedTarget;
+    private bool forcedLock;
     private float nextRefreshTime;
 
     private Canvas hudCanvas;
@@ -70,7 +71,11 @@ public class TargetingManager : MonoBehaviour
         EnsureReferences();
         RefreshTargetsIfNeeded();
 
-        if (lockedTarget != null && !IsTargetValid(lockedTarget))
+        if (lockedTarget == null)
+        {
+            forcedLock = false;
+        }
+        else if (!forcedLock && !IsTargetValid(lockedTarget))
         {
             UnlockTarget();
         }
@@ -92,12 +97,27 @@ public class TargetingManager : MonoBehaviour
         if (currentTarget != null)
         {
             lockedTarget = currentTarget;
+            forcedLock = false;
+        }
+    }
+
+    public void LockTarget(Transform target, bool forceLock = false)
+    {
+        EnsureReferences();
+        lockedTarget = target;
+        currentTarget = target;
+        forcedLock = target != null && forceLock;
+
+        if (target != null && !targetCandidates.Contains(target))
+        {
+            targetCandidates.Add(target);
         }
     }
 
     public void UnlockTarget()
     {
         lockedTarget = null;
+        forcedLock = false;
     }
 
     public bool TryGetLockedDirection(out Vector3 direction)
@@ -465,7 +485,7 @@ public class TargetingManager : MonoBehaviour
         text.fontStyle = style;
         text.alignment = TextAlignmentOptions.Left;
         text.textWrappingMode = TextWrappingModes.NoWrap;
-        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.overflowMode = TextOverflowModes.Truncate;
         text.color = targetColor;
         return text;
     }

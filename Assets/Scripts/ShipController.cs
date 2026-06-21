@@ -59,6 +59,8 @@ public class ShipController : MonoBehaviour
     private Vector2 mouseInput;
     private int cachedFarSpaceLayer = -2;
 
+    public bool UseFloatingOrigin => useFloatingOrigin;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -426,6 +428,21 @@ public class ShipController : MonoBehaviour
         thrustForce *= amount;
     }
 
+    public void SetFloatingOriginEnabled(bool isEnabled)
+    {
+        useFloatingOrigin = isEnabled;
+    }
+
+    public void RecenterForHyperCruise(Vector3 originOffset)
+    {
+        if (originOffset.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        RecenterWorld(originOffset);
+    }
+
     public void ApplyHyperCruiseBoost(float thrust)
     {
         desiredThrust = Mathf.Clamp(thrust, -30f, 70f);
@@ -439,6 +456,33 @@ public class ShipController : MonoBehaviour
         if (rb != null)
         {
             rb.linearVelocity = transform.forward * (actualThrust * thrustForce);
+        }
+    }
+
+    public void MoveHyperCruisePosition(Vector3 worldPosition, Vector3 lockDirection, float thrust)
+    {
+        desiredThrust = Mathf.Clamp(thrust, -30f, 70f);
+        actualThrust = desiredThrust;
+
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        Vector3 velocityDirection = lockDirection.sqrMagnitude > 0.0001f
+            ? lockDirection.normalized
+            : transform.forward;
+        SetNavigationLockDirection(velocityDirection.sqrMagnitude > 0.0001f, velocityDirection);
+
+        if (rb != null)
+        {
+            rb.position = worldPosition;
+            rb.transform.position = worldPosition;
+            rb.linearVelocity = velocityDirection * (actualThrust * thrustForce);
+        }
+        else
+        {
+            transform.position = worldPosition;
         }
     }
 }

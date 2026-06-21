@@ -14,6 +14,7 @@ public class HyperDriveManager : MonoBehaviour
     {
         public string destinationName = "EARTH";
         public string sceneName = "Earth";
+        public string targetObjectName = "Earth";
         public Vector3 galacticCoordinates;
         public Color accentColor = new Color(1f, 0.48f, 0.04f, 1f);
         public bool enabled = true;
@@ -41,6 +42,10 @@ public class HyperDriveManager : MonoBehaviour
     [SerializeField] private float departureDistortionDuration = 4f;
     [SerializeField] private float arrivalDistortionDuration = 4f;
     [SerializeField] private float hyperCruiseThrust = 70f;
+    [SerializeField] private float arrivalDistanceFromTarget = 120f;
+    [SerializeField] private float arrivalRadiusMultiplier = 2.35f;
+    [SerializeField] private string farSpaceLayerName = "FarSpace";
+    [SerializeField] private string trackingTargetTag = "TrackingObject";
 
     private readonly List<Button> destinationButtons = new List<Button>();
     private readonly List<TMP_Text> destinationLabels = new List<TMP_Text>();
@@ -65,10 +70,6 @@ public class HyperDriveManager : MonoBehaviour
     private static readonly Color NeonBlue = new Color(0.05f, 0.78f, 1f, 1f);
     private static readonly Color PanelDark = new Color(0.035f, 0.018f, 0.006f, 0.72f);
 
-    private static bool pendingArrivalTransition;
-    private static float arrivalLensDistortionIntensity = -0.2f;
-    private static float arrivalHyperCruiseThrust = 70f;
-
     public float WarpGauge01 => maximumWarpGauge > 0f ? Mathf.Clamp01(currentWarpGauge / maximumWarpGauge) : 0f;
     public bool IsJumping => isJumping;
 
@@ -78,33 +79,12 @@ public class HyperDriveManager : MonoBehaviour
         EnsureDefaultDestinations();
     }
 
-    private void OnEnable()
-    {
-        SceneManager.activeSceneChanged += HandleActiveSceneChanged;
-    }
-
-    private void OnDisable()
-    {
-        SceneManager.activeSceneChanged -= HandleActiveSceneChanged;
-    }
-
     private void Start()
     {
-        RefreshCurrentLocationFromScene(SceneManager.GetActiveScene().name);
+        RefreshCurrentLocationFromNearestDestination();
         SelectFirstRemoteDestination();
         ConfigureOutsideOnlyPostProcessing();
-
-        if (pendingArrivalTransition)
-        {
-            pendingArrivalTransition = false;
-            SetLensDistortionIntensity(arrivalLensDistortionIntensity);
-            ApplyHyperCruiseSpeed(arrivalHyperCruiseThrust);
-            StartCoroutine(RecoverFromHyperCruiseArrival());
-        }
-        else
-        {
-            SetLensDistortionIntensity(normalLensDistortionIntensity);
-        }
+        SetLensDistortionIntensity(normalLensDistortionIntensity);
 
         if (createHudOnStart)
         {
@@ -135,9 +115,16 @@ public class HyperDriveManager : MonoBehaviour
             return false;
         }
 
-        if (IsCurrentScene(destination))
+        if (IsLocalDestination(destination))
         {
             SetStatus("ALREADY IN LOCAL ORBIT", DimOrange);
+            return false;
+        }
+
+        Transform target = FindDestinationTarget(destination);
+        if (target == null)
+        {
+            SetStatus("DESTINATION TARGET OFFLINE", new Color(1f, 0.18f, 0.04f, 1f));
             return false;
         }
 
@@ -148,53 +135,55 @@ public class HyperDriveManager : MonoBehaviour
             return false;
         }
 
-        StartCoroutine(RunHyperCruiseRoutine(destination, cost));
+        StartCoroutine(RunHyperCruiseRoutine(destination, target, cost));
         return true;
     }
 
-    private IEnumerator RunHyperCruiseRoutine(HyperCruiseDestination destination, float cost)
+    private IEnumerator RunHyperCruiseRoutine(HyperCruiseDestination destination, Transform target, float cost)
     {
+        ShipController shipController = FindFirstObjectByType<ShipController>();
+        if (shipController == null || target == null)
+        {
+            SetStatus("HYPER CRUISE OFFLINE", new Color(1f, 0.18f, 0.04f, 1f));
+            yield break;
+        }
+
         isJumping = true;
         currentWarpGauge = Mathf.Max(0f, currentWarpGauge - cost);
         SetStatus("HYPER CRUISE JUMP", NeonBlue);
         RefreshHud();
         ConfigureOutsideOnlyPostProcessing();
-        ApplyHyperCruiseSpeed(hyperCruiseThrust);
 
-        if (!string.IsNullOrWhiteSpace(destination.sceneName) && Application.CanStreamedLevelBeLoaded(destination.sceneName))
+        TargetingManager targetingManager = FindFirstObjectByType<TargetingManager>();
+        if (targetingManager != null)
         {
-            float currentIntensity = GetLensDistortionIntensity(normalLensDistortionIntensity);
-            yield return AnimateLensDistortion(currentIntensity, hyperCruiseLensDistortionIntensity, departureDistortionDuration);
-
-            pendingArrivalTransition = true;
-            arrivalLensDistortionIntensity = hyperCruiseLensDistortionIntensity;
-            arrivalHyperCruiseThrust = hyperCruiseThrust;
-#if UNITY_EDITOR
-            ClearEditorVolumeSelectionBeforeSceneLoad();
-#endif
-            SceneManager.LoadScene(destination.sceneName);
+            targetingManager.LockTarget(target, true);
         }
-        else
+
+        bool restoreFloatingOrigin = shipController.UseFloatingOrigin;
+        shipController.SetFloatingOriginEnabled(false);
+
+        float currentIntensity = GetLensDistortionIntensity(normalLensDistortionIntensity);
+        yield return AnimateLensDistortionAndMove(
+            currentIntensity,
+            hyperCruiseLensDistortionIntensity,
+            departureDistortionDuration,
+            shipController,
+            target);
+
+        MoveShipNearDestination(shipController, target);
+
+        if (restoreFloatingOrigin)
         {
-            Debug.LogWarning($"Hyper Cruise destination scene is not loadable: {destination.sceneName}");
-            SetStatus("DESTINATION SCENE OFFLINE", new Color(1f, 0.18f, 0.04f, 1f));
-            SetLensDistortionIntensity(normalLensDistortionIntensity);
-            isJumping = false;
+            shipController.SetFloatingOriginEnabled(true);
         }
-    }
 
-    private IEnumerator RecoverFromHyperCruiseArrival()
-    {
-        yield return AnimateLensDistortion(arrivalLensDistortionIntensity, normalLensDistortionIntensity, arrivalDistortionDuration);
-        SetStatus("HYPER CRUISE READY", NeonOrange);
-    }
-
-    private void HandleActiveSceneChanged(Scene previousScene, Scene newScene)
-    {
-        RefreshCurrentLocationFromScene(newScene.name);
+        currentGalacticCoordinates = destination.galacticCoordinates;
         SelectFirstRemoteDestination();
+        yield return AnimateLensDistortion(hyperCruiseLensDistortionIntensity, normalLensDistortionIntensity, arrivalDistortionDuration);
         isJumping = false;
         SetStatus("HYPER CRUISE READY", NeonOrange);
+        RefreshHud();
     }
 
     private void EnsureDefaultDestinations()
@@ -208,6 +197,7 @@ public class HyperDriveManager : MonoBehaviour
         {
             destinationName = "EARTH",
             sceneName = "Earth",
+            targetObjectName = "Earth",
             galacticCoordinates = new Vector3(0f, 0f, 0f),
             accentColor = new Color(0.12f, 0.78f, 1f, 1f)
         });
@@ -215,21 +205,37 @@ public class HyperDriveManager : MonoBehaviour
         {
             destinationName = "SATURN",
             sceneName = "Saturn",
+            targetObjectName = "Saturn",
             galacticCoordinates = new Vector3(74f, 8f, 39f),
             accentColor = new Color(1f, 0.55f, 0.08f, 1f)
         });
     }
 
-    private void RefreshCurrentLocationFromScene(string sceneName)
+    private void RefreshCurrentLocationFromNearestDestination()
     {
+        float bestDistance = float.MaxValue;
+        HyperCruiseDestination nearestDestination = null;
+
         for (int i = 0; i < destinations.Count; i++)
         {
             HyperCruiseDestination destination = destinations[i];
-            if (destination != null && destination.sceneName == sceneName)
+            Transform target = FindDestinationTarget(destination);
+            if (destination == null || target == null)
             {
-                currentGalacticCoordinates = destination.galacticCoordinates;
-                return;
+                continue;
             }
+
+            float distance = GetNavigationDistanceToTarget(target);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                nearestDestination = destination;
+            }
+        }
+
+        if (nearestDestination != null && bestDistance <= GetLocalOrbitDistance(nearestDestination))
+        {
+            currentGalacticCoordinates = nearestDestination.galacticCoordinates;
         }
     }
 
@@ -237,7 +243,7 @@ public class HyperDriveManager : MonoBehaviour
     {
         for (int i = 0; i < destinations.Count; i++)
         {
-            if (destinations[i] != null && destinations[i].enabled && !IsCurrentScene(destinations[i]))
+            if (destinations[i] != null && destinations[i].enabled && !IsLocalDestination(destinations[i]))
             {
                 selectedDestinationIndex = i;
                 return;
@@ -260,9 +266,10 @@ public class HyperDriveManager : MonoBehaviour
         return destination != null && destination.enabled;
     }
 
-    private bool IsCurrentScene(HyperCruiseDestination destination)
+    private bool IsLocalDestination(HyperCruiseDestination destination)
     {
-        return destination != null && SceneManager.GetActiveScene().name == destination.sceneName;
+        Transform target = FindDestinationTarget(destination);
+        return target != null && GetNavigationDistanceToTarget(target) <= GetLocalOrbitDistance(destination);
     }
 
     private float GetWarpCost(HyperCruiseDestination destination)
@@ -519,7 +526,7 @@ public class HyperDriveManager : MonoBehaviour
             HyperCruiseDestination destination = destinations[i];
             float cost = GetWarpCost(destination);
             bool isSelected = i == selectedDestinationIndex;
-            bool isLocal = IsCurrentScene(destination);
+            bool isLocal = IsLocalDestination(destination);
             bool canAfford = currentWarpGauge >= cost;
 
             destinationButtons[i].interactable = destination.enabled && !isJumping && !isLocal;
@@ -548,6 +555,441 @@ public class HyperDriveManager : MonoBehaviour
         warpStatusText.color = color;
     }
 
+    private IEnumerator AnimateLensDistortionAndMove(
+        float fromIntensity,
+        float toIntensity,
+        float duration,
+        ShipController shipController,
+        Transform target)
+    {
+        if (duration <= 0f)
+        {
+            SetLensDistortionIntensity(toIntensity);
+            MoveShipNearDestination(shipController, target);
+            yield break;
+        }
+
+        Vector3 startPosition = shipController.transform.position;
+        float elapsed = 0f;
+
+        while (elapsed < duration && shipController != null && target != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float easedT = Mathf.SmoothStep(0f, 1f, t);
+            Vector3 destinationPosition = GetShipArrivalWorldPosition(shipController.transform.position, target);
+            Vector3 nextPosition = Vector3.Lerp(startPosition, destinationPosition, easedT);
+            Vector3 lockDirection = GetDirectionToTarget(shipController.transform.position, target);
+
+            shipController.MoveHyperCruisePosition(nextPosition, lockDirection, hyperCruiseThrust);
+            SetLensDistortionIntensity(Mathf.Lerp(fromIntensity, toIntensity, easedT));
+            yield return null;
+        }
+
+        SetLensDistortionIntensity(toIntensity);
+    }
+
+    private void MoveShipNearDestination(ShipController shipController, Transform target)
+    {
+        if (shipController == null || target == null)
+        {
+            return;
+        }
+
+        ShiftDestinationWorldNearShip(shipController, target);
+        Vector3 lockDirection = GetDirectionToTarget(Vector3.zero, target);
+        shipController.MoveHyperCruisePosition(Vector3.zero, lockDirection, hyperCruiseThrust);
+    }
+
+    private void ShiftDestinationWorldNearShip(ShipController shipController, Transform target)
+    {
+        bool isFarSpaceTarget = IsFarSpaceTarget(target);
+        float farSpaceScale = GetFarSpaceMovementScale();
+        Vector3 currentViewerPosition = isFarSpaceTarget
+            ? shipController.transform.position * farSpaceScale
+            : shipController.transform.position;
+        Vector3 targetPoint = GetTargetPoint(target);
+        Vector3 directionToTarget = targetPoint - currentViewerPosition;
+
+        if (directionToTarget.sqrMagnitude < 0.0001f)
+        {
+            directionToTarget = shipController.transform.forward;
+        }
+
+        directionToTarget.Normalize();
+        Vector3 desiredTargetPoint = directionToTarget * GetArrivalOffset(target);
+        Vector3 worldShift = targetPoint - desiredTargetPoint;
+        ShiftMatchingWorldRoots(worldShift, isFarSpaceTarget, shipController.transform.root);
+        Physics.SyncTransforms();
+    }
+
+    private void ShiftMatchingWorldRoots(Vector3 worldShift, bool shiftFarSpaceRoots, Transform playerRoot)
+    {
+        if (worldShift.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        for (int i = 0; i < SceneManager.sceneCount; i++)
+        {
+            Scene scene = SceneManager.GetSceneAt(i);
+            if (!scene.isLoaded)
+            {
+                continue;
+            }
+
+            GameObject[] rootObjects = scene.GetRootGameObjects();
+            for (int j = 0; j < rootObjects.Length; j++)
+            {
+                GameObject rootObject = rootObjects[j];
+                if (ShouldSkipHyperCruiseShiftRoot(rootObject, playerRoot))
+                {
+                    continue;
+                }
+
+                bool isFarSpaceRoot = IsFarSpaceRoot(rootObject);
+                if (isFarSpaceRoot != shiftFarSpaceRoots)
+                {
+                    continue;
+                }
+
+                rootObject.transform.position -= worldShift;
+            }
+        }
+    }
+
+    private bool ShouldSkipHyperCruiseShiftRoot(GameObject rootObject, Transform playerRoot)
+    {
+        if (rootObject == null)
+        {
+            return true;
+        }
+
+        Transform rootTransform = rootObject.transform;
+        if (rootTransform == playerRoot || rootTransform.IsChildOf(playerRoot))
+        {
+            return true;
+        }
+
+        return rootObject.GetComponent<Camera>() != null
+            || rootObject.GetComponent<FarSpaceCameraSync>() != null
+            || rootObject.GetComponent<Canvas>() != null
+            || rootObject.name == "EventSystem"
+            || rootObject.name == "Global Volume"
+            || rootObject.name == "UniversalLight";
+    }
+
+    private bool IsFarSpaceRoot(GameObject rootObject)
+    {
+        if (rootObject == null)
+        {
+            return false;
+        }
+
+        int farSpaceLayer = LayerMask.NameToLayer(farSpaceLayerName);
+        Transform[] children = rootObject.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            GameObject childObject = children[i].gameObject;
+            if ((farSpaceLayer >= 0 && childObject.layer == farSpaceLayer) || HasTag(childObject, trackingTargetTag))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private Transform FindDestinationTarget(HyperCruiseDestination destination)
+    {
+        if (destination == null)
+        {
+            return null;
+        }
+
+        string targetName = !string.IsNullOrWhiteSpace(destination.targetObjectName)
+            ? destination.targetObjectName
+            : destination.destinationName;
+        Transform exactTarget = FindTargetByExactName(targetName);
+        if (exactTarget != null)
+        {
+            return exactTarget;
+        }
+
+        Transform taggedTarget = FindTaggedTargetByDestinationName(destination);
+        if (taggedTarget != null)
+        {
+            return taggedTarget;
+        }
+
+        return FindAnyTransformByDestinationName(destination);
+    }
+
+    private Transform FindTargetByExactName(string targetName)
+    {
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            return null;
+        }
+
+        GameObject targetObject = GameObject.Find(targetName);
+        return targetObject != null ? targetObject.transform : null;
+    }
+
+    private Transform FindTaggedTargetByDestinationName(HyperCruiseDestination destination)
+    {
+        GameObject[] taggedTargets;
+        try
+        {
+            taggedTargets = GameObject.FindGameObjectsWithTag(trackingTargetTag);
+        }
+        catch (UnityException)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < taggedTargets.Length; i++)
+        {
+            if (taggedTargets[i] != null && IsDestinationNameMatch(taggedTargets[i].name, destination))
+            {
+                return taggedTargets[i].transform;
+            }
+        }
+
+        return null;
+    }
+
+    private Transform FindAnyTransformByDestinationName(HyperCruiseDestination destination)
+    {
+        Transform[] transforms = FindObjectsByType<Transform>(FindObjectsSortMode.None);
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            if (transforms[i] != null && IsDestinationNameMatch(transforms[i].name, destination))
+            {
+                return transforms[i];
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsDestinationNameMatch(string objectName, HyperCruiseDestination destination)
+    {
+        if (destination == null || string.IsNullOrWhiteSpace(objectName))
+        {
+            return false;
+        }
+
+        string normalizedObjectName = NormalizeDestinationName(objectName);
+        string normalizedDestinationName = NormalizeDestinationName(destination.destinationName);
+        string normalizedTargetName = NormalizeDestinationName(destination.targetObjectName);
+
+        return normalizedObjectName == normalizedDestinationName
+            || normalizedObjectName == normalizedTargetName
+            || (!string.IsNullOrEmpty(normalizedDestinationName) && normalizedObjectName.Contains(normalizedDestinationName))
+            || (!string.IsNullOrEmpty(normalizedTargetName) && normalizedObjectName.Contains(normalizedTargetName));
+    }
+
+    private string NormalizeDestinationName(string value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Replace(" ", string.Empty).Replace("_", string.Empty).ToUpperInvariant();
+    }
+
+    private Vector3 GetShipArrivalWorldPosition(Vector3 shipWorldPosition, Transform target)
+    {
+        Vector3 targetPoint = GetTargetPoint(target);
+        bool isFarSpaceTarget = IsFarSpaceTarget(target);
+        float farSpaceScale = GetFarSpaceMovementScale();
+        Vector3 viewerPosition = isFarSpaceTarget ? shipWorldPosition * farSpaceScale : shipWorldPosition;
+        Vector3 awayFromTarget = viewerPosition - targetPoint;
+
+        if (awayFromTarget.sqrMagnitude < 0.0001f)
+        {
+            awayFromTarget = -target.forward;
+        }
+
+        awayFromTarget.Normalize();
+        float arrivalOffset = GetArrivalOffset(target);
+        Vector3 viewerArrivalPosition = targetPoint + awayFromTarget * arrivalOffset;
+        return isFarSpaceTarget ? viewerArrivalPosition / Mathf.Max(0.0001f, farSpaceScale) : viewerArrivalPosition;
+    }
+
+    private Vector3 GetDirectionToTarget(Vector3 shipWorldPosition, Transform target)
+    {
+        if (target == null)
+        {
+            return Vector3.zero;
+        }
+
+        bool isFarSpaceTarget = IsFarSpaceTarget(target);
+        float farSpaceScale = GetFarSpaceMovementScale();
+        Vector3 viewerPosition = isFarSpaceTarget ? shipWorldPosition * farSpaceScale : shipWorldPosition;
+        Vector3 direction = GetTargetPoint(target) - viewerPosition;
+        return direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.zero;
+    }
+
+    private float GetNavigationDistanceToTarget(Transform target)
+    {
+        ShipController shipController = FindFirstObjectByType<ShipController>();
+        if (shipController == null || target == null)
+        {
+            return float.MaxValue;
+        }
+
+        bool isFarSpaceTarget = IsFarSpaceTarget(target);
+        float farSpaceScale = GetFarSpaceMovementScale();
+        Vector3 viewerPosition = isFarSpaceTarget
+            ? shipController.transform.position * farSpaceScale
+            : shipController.transform.position;
+        float visualDistance = Vector3.Distance(viewerPosition, GetTargetPoint(target));
+        return isFarSpaceTarget ? visualDistance / Mathf.Max(0.0001f, farSpaceScale) : visualDistance;
+    }
+
+    private float GetLocalOrbitDistance(HyperCruiseDestination destination)
+    {
+        Transform target = FindDestinationTarget(destination);
+        if (target == null)
+        {
+            return arrivalDistanceFromTarget;
+        }
+
+        float localDistance = GetArrivalOffset(target) * 1.5f;
+        return IsFarSpaceTarget(target)
+            ? localDistance / Mathf.Max(0.0001f, GetFarSpaceMovementScale())
+            : localDistance;
+    }
+
+    private float GetArrivalOffset(Transform target)
+    {
+        float targetRadius = EstimateTargetRadius(target);
+        return Mathf.Max(arrivalDistanceFromTarget, targetRadius * arrivalRadiusMultiplier);
+    }
+
+    private Vector3 GetTargetPoint(Transform target)
+    {
+        if (TryGetTargetBounds(target, out Bounds bounds))
+        {
+            return bounds.center;
+        }
+
+        return target != null ? target.position : Vector3.zero;
+    }
+
+    private float EstimateTargetRadius(Transform target)
+    {
+        if (TryGetTargetBounds(target, out Bounds bounds))
+        {
+            return bounds.extents.magnitude;
+        }
+
+        return target != null ? Mathf.Max(target.lossyScale.x, target.lossyScale.y, target.lossyScale.z) : 1f;
+    }
+
+    private bool TryGetTargetBounds(Transform target, out Bounds bounds)
+    {
+        bounds = new Bounds(target != null ? target.position : Vector3.zero, Vector3.one);
+        if (target == null)
+        {
+            return false;
+        }
+
+        bool hasBounds = false;
+        Renderer[] renderers = target.GetComponentsInChildren<Renderer>();
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] == null)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = renderers[i].bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+        }
+
+        if (hasBounds)
+        {
+            return true;
+        }
+
+        Collider[] colliders = target.GetComponentsInChildren<Collider>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] == null)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = colliders[i].bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(colliders[i].bounds);
+            }
+        }
+
+        return hasBounds;
+    }
+
+    private bool IsFarSpaceTarget(Transform target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        int farSpaceLayer = LayerMask.NameToLayer(farSpaceLayerName);
+        Transform current = target;
+        while (current != null)
+        {
+            if ((farSpaceLayer >= 0 && current.gameObject.layer == farSpaceLayer)
+                || HasTag(current.gameObject, trackingTargetTag))
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
+    }
+
+    private bool HasTag(GameObject targetObject, string tagName)
+    {
+        if (targetObject == null || string.IsNullOrWhiteSpace(tagName))
+        {
+            return false;
+        }
+
+        try
+        {
+            return targetObject.CompareTag(tagName);
+        }
+        catch (UnityException)
+        {
+            return false;
+        }
+    }
+
+    private float GetFarSpaceMovementScale()
+    {
+        FarSpaceCameraSync farSpaceSync = FindFirstObjectByType<FarSpaceCameraSync>();
+        return farSpaceSync != null && farSpaceSync.movementScale > 0.0001f
+            ? farSpaceSync.movementScale
+            : 1f;
+    }
+
     private IEnumerator AnimateLensDistortion(float fromIntensity, float toIntensity, float duration)
     {
         if (duration <= 0f)
@@ -567,15 +1009,6 @@ public class HyperDriveManager : MonoBehaviour
         }
 
         SetLensDistortionIntensity(toIntensity);
-    }
-
-    private void ApplyHyperCruiseSpeed(float thrust)
-    {
-        ShipController shipController = FindFirstObjectByType<ShipController>();
-        if (shipController != null)
-        {
-            shipController.ApplyHyperCruiseBoost(thrust);
-        }
     }
 
     private void ConfigureOutsideOnlyPostProcessing()
@@ -638,22 +1071,5 @@ public class HyperDriveManager : MonoBehaviour
 
         return volume.profile != null ? volume.profile : volume.sharedProfile;
     }
-
-#if UNITY_EDITOR
-    private void ClearEditorVolumeSelectionBeforeSceneLoad()
-    {
-        if (UnityEditor.Selection.activeObject is Volume)
-        {
-            UnityEditor.Selection.activeObject = null;
-            return;
-        }
-
-        GameObject selectedObject = UnityEditor.Selection.activeGameObject;
-        if (selectedObject != null && selectedObject.GetComponent<Volume>() != null)
-        {
-            UnityEditor.Selection.activeObject = null;
-        }
-    }
-#endif
 
 }

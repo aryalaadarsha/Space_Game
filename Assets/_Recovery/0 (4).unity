@@ -7113,8 +7113,8 @@ MonoBehaviour:
   hudSortingOrder: 280
   normalLensDistortionIntensity: -0.2
   hyperCruiseLensDistortionIntensity: -0.78
-  departureDistortionDuration: 4
-  arrivalDistortionDuration: 4
+  departureDistortionDuration: 0.85
+  arrivalDistortionDuration: 1.15
   hyperCruiseThrust: 70
 --- !u!1 &1001032970
 GameObject:
@@ -8256,63 +8256,6 @@ LineRenderer:
   m_UseWorldSpace: 0
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
---- !u!1001 &1134416196
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 34186.16
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -0.000018113424
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -30344.336
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6714313137242485921, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_Name
-      value: Saturn
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
 --- !u!1001 &1139821435
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -21796,4 +21739,3 @@ SceneRoots:
   - {fileID: 201662830}
   - {fileID: 1477452408}
   - {fileID: 136369797}
-  - {fileID: 1134416196}
