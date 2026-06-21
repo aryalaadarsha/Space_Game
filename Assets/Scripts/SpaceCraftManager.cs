@@ -122,12 +122,20 @@ public class SpaceCraftManager : MonoBehaviour
         }
     }
 
-    public void OnMovementUpdated(float desiredThrust, float actualThrust, Vector3 velocity, Vector3 angularVelocity)
+    public void OnMovementUpdated(
+        float desiredThrust,
+        float actualThrust,
+        Vector3 velocity,
+        Vector3 angularVelocity,
+        float actualThrustChangeRate,
+        bool isActuallyAccelerating)
     {
         currentMovementData.desiredThrust = desiredThrust;
         currentMovementData.actualThrust = actualThrust;
         currentMovementData.velocity = velocity;
         currentMovementData.angularVelocity = angularVelocity;
+        currentMovementData.actualThrustChangeRate = actualThrustChangeRate;
+        currentMovementData.isActuallyAccelerating = isActuallyAccelerating;
         
         if (sUIManager != null)
         {
@@ -135,7 +143,7 @@ public class SpaceCraftManager : MonoBehaviour
         }
         if (cManager != null)
         {
-            cManager.OnThrustChanged(actualThrust, desiredThrust);
+            cManager.OnThrustChanged(actualThrust, desiredThrust, actualThrustChangeRate, isActuallyAccelerating, angularVelocity);
         }
     }
 
@@ -187,4 +195,6 @@ public struct MovementData
     public float desiredThrust;
     public Vector3 velocity;
     public Vector3 angularVelocity;
+    public float actualThrustChangeRate;
+    public bool isActuallyAccelerating;
 }

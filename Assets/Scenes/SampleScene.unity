@@ -5376,19 +5376,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4677324220665258, guid: b4201d402613a4464b35c805dafcca62, type: 3}
       propertyPath: m_LocalScale.x
-      value: 100
+      value: 600
       objectReference: {fileID: 0}
     - target: {fileID: 4677324220665258, guid: b4201d402613a4464b35c805dafcca62, type: 3}
       propertyPath: m_LocalScale.y
-      value: 100
+      value: 600
       objectReference: {fileID: 0}
     - target: {fileID: 4677324220665258, guid: b4201d402613a4464b35c805dafcca62, type: 3}
       propertyPath: m_LocalScale.z
-      value: 100
+      value: 600
       objectReference: {fileID: 0}
     - target: {fileID: 4677324220665258, guid: b4201d402613a4464b35c805dafcca62, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -161.71497
+      value: 31659
       objectReference: {fileID: 0}
     - target: {fileID: 4677324220665258, guid: b4201d402613a4464b35c805dafcca62, type: 3}
       propertyPath: m_LocalPosition.y
@@ -5396,7 +5396,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4677324220665258, guid: b4201d402613a4464b35c805dafcca62, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 22235
+      value: 67385
       objectReference: {fileID: 0}
     - target: {fileID: 4677324220665258, guid: b4201d402613a4464b35c805dafcca62, type: 3}
       propertyPath: m_LocalRotation.w
@@ -6149,14 +6149,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 25b0e1b778c2db545839112c2fc4df0e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipController
-  thrustForce: 2
+  thrustForce: 20
   thrustLerpSpeed: 0.5
+  thrustSnapThreshold: 0.05
   strafeForce: 70
   rotationSpeed: 0.7
   mouseSensitivity: 0.005
+  useFloatingOrigin: 1
+  floatingOriginThreshold: 2000
+  farSpaceLayerName: FarSpace
+  defaultFarSpaceMovementScale: 0.1
   snapZoneRadius: 0.03
   lockTurnSpeed: 80
+  lockTurnAcceleration: 14
+  lockTurnDeceleration: 24
+  lockSlowdownAngle: 18
+  lockMinimumTurnSpeed: 2.5
+  lockSettleAngle: 0.35
+  lockSettleSmoothing: 5
+  lockDirectionSmoothing: 3.5
   lockAngularDamping: 8
+  lockPreservesCurrentRoll: 1
 --- !u!54 &828377128
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -6645,9 +6658,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a78379f7ded97e54a88dcce9da2d0180, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraManager
-  camShakeIntensityModifier: 0.012
-  camShakeThreshold: 1
-  camShakeInterval: 0.01
+  camShakeIntensityModifier: 1
+  camShakeThreshold: 2.5
+  camShakeFullAccelerationRate: 30
+  camShakeInterval: 0.025
+  maxCamShakeOffset: 0.0012
+  brakingShakeMultiplier: 0.35
+  turningShakeMultiplier: 0.25
+  turningSuppressionStart: 0.15
+  turningSuppressionEnd: 0.9
   cameraLookOffsetAmount: 0.02
   cameraLookSmoothSpeed: 2
   browseMaxAngle: 90
@@ -7852,7 +7871,7 @@ MonoBehaviour:
   targetLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  maxTargetDistance: 35000
+  maxTargetDistance: 120000
   maxAimAngle: 3.5
   targetRefreshInterval: 0.5
   targetColor: {r: 1, g: 0.45, b: 0.05, a: 0.95}
@@ -7956,7 +7975,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1038275261}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -0.175}
+  m_LocalPosition: {x: 0, y: 0, z: -0.22}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -7966,7 +7985,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -1.56, y: -0.67}
+  m_AnchoredPosition: {x: -1.43, y: -0.67}
   m_SizeDelta: {x: 0.62, y: 0.5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1065150442
@@ -8356,15 +8375,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4643521465287934, guid: 300f80108a63f48618cb4a1c8b8c1e86, type: 3}
       propertyPath: m_LocalScale.x
-      value: 100
+      value: 500
       objectReference: {fileID: 0}
     - target: {fileID: 4643521465287934, guid: 300f80108a63f48618cb4a1c8b8c1e86, type: 3}
       propertyPath: m_LocalScale.y
-      value: 100
+      value: 500
       objectReference: {fileID: 0}
     - target: {fileID: 4643521465287934, guid: 300f80108a63f48618cb4a1c8b8c1e86, type: 3}
       propertyPath: m_LocalScale.z
-      value: 100
+      value: 500
       objectReference: {fileID: 0}
     - target: {fileID: 4643521465287934, guid: 300f80108a63f48618cb4a1c8b8c1e86, type: 3}
       propertyPath: m_LocalPosition.x
@@ -8376,7 +8395,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4643521465287934, guid: 300f80108a63f48618cb4a1c8b8c1e86, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 1854
+      value: 12614
       objectReference: {fileID: 0}
     - target: {fileID: 4643521465287934, guid: 300f80108a63f48618cb4a1c8b8c1e86, type: 3}
       propertyPath: m_LocalRotation.w

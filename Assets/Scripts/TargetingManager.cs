@@ -12,7 +12,7 @@ public class TargetingManager : MonoBehaviour
     [Header("Target Search")]
     [SerializeField] private string targetTag = "TrackingObject";
     [SerializeField] private LayerMask targetLayers = ~0;
-    [SerializeField] private float maxTargetDistance = 35000f;
+    [SerializeField] private float maxTargetDistance = 120000f;
     [SerializeField] private float maxAimAngle = 3.5f;
     [SerializeField] private float targetRefreshInterval = 0.5f;
 
