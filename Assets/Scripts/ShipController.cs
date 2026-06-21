@@ -48,6 +48,7 @@ public class ShipController : MonoBehaviour
     private bool hasNavigationLock;
     private Vector3 navigationLockDirection;
     private float currentLockTurnSpeed;
+    private bool hyperCruiseOverrideActive;
 
     private float actualThrust = 0f;
     private Vector2 moveInput;
@@ -58,6 +59,9 @@ public class ShipController : MonoBehaviour
     private float yawInput;
     private Vector2 mouseInput;
     private int cachedFarSpaceLayer = -2;
+    private float suppressLookInputUntil;
+    private Vector2 mouseNeutralPosition;
+    private bool hasMouseNeutralPosition;
 
     public bool UseFloatingOrigin => useFloatingOrigin;
 
@@ -70,11 +74,20 @@ public class ShipController : MonoBehaviour
     void Start()
     {
         Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        UnityEngine.InputSystem.Mouse.current.WarpCursorPosition(screenCenter);
+        SetMouseNeutralPosition(screenCenter);
+        TryWarpCursorToCenter();
     }
 
     public void SetInputs(Vector2 _strafe, float _thrustInput, float _yaw)
     {
+        if (hyperCruiseOverrideActive)
+        {
+            moveInput = Vector2.zero;
+            thrustInput = 0f;
+            yawInput = 0f;
+            return;
+        }
+
         moveInput = _strafe;
         thrustInput = _thrustInput;
         yawInput = _yaw;
@@ -82,7 +95,44 @@ public class ShipController : MonoBehaviour
 
     public void SetMouseInput(Vector2 _mousePos)
     {
+        if (IsLookInputSuppressed())
+        {
+            SetMouseNeutralPosition(_mousePos);
+            TryWarpCursorToCenter();
+            return;
+        }
+
         mouseInput = _mousePos;
+    }
+
+    public void ResetLookInputReference()
+    {
+        Vector2 neutralPosition = UnityEngine.InputSystem.Mouse.current != null
+            ? UnityEngine.InputSystem.Mouse.current.position.ReadValue()
+            : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        SetMouseNeutralPosition(neutralPosition);
+        TryWarpCursorToCenter();
+    }
+
+    private void SetMouseNeutralPosition(Vector2 neutralPosition)
+    {
+        mouseNeutralPosition = neutralPosition;
+        mouseInput = neutralPosition;
+        hasMouseNeutralPosition = true;
+    }
+
+    private void TryWarpCursorToCenter()
+    {
+        if (UnityEngine.InputSystem.Mouse.current != null)
+        {
+            UnityEngine.InputSystem.Mouse.current.WarpCursorPosition(new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
+        }
+    }
+
+    public void SuppressLookInput(float duration)
+    {
+        suppressLookInputUntil = Mathf.Max(suppressLookInputUntil, Time.unscaledTime + Mathf.Max(0f, duration));
+        ResetLookInputReference();
     }
 
     public void ResetThrust()
@@ -121,6 +171,17 @@ public class ShipController : MonoBehaviour
     void FixedUpdate()
     {
         UpdateThrust();
+        if (hyperCruiseOverrideActive)
+        {
+            if (rb != null)
+            {
+                rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, 10f * Time.fixedDeltaTime);
+            }
+
+            AfterMovement();
+            return;
+        }
+
         ApplyTranslation();
         if (hasNavigationLock)
         {
@@ -174,6 +235,11 @@ public class ShipController : MonoBehaviour
 
     private Vector2 HandleShipMouseControl()
     {
+        if (IsLookInputSuppressed())
+        {
+            return Vector2.zero;
+        }
+
         if (!isInitialized)
         {
             initFrameCount++;
@@ -186,8 +252,10 @@ public class ShipController : MonoBehaviour
             return Vector2.zero;
         }
 
-        Vector2 screenCenter2 = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        Vector2 mouseOffset = mouseInput - screenCenter2;
+        Vector2 neutralPosition = hasMouseNeutralPosition
+            ? mouseNeutralPosition
+            : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        Vector2 mouseOffset = mouseInput - neutralPosition;
         Vector2 normalizedOffset = new Vector2(mouseOffset.x / Screen.width, mouseOffset.y / Screen.height);
         float distanceToCenter = normalizedOffset.magnitude;
 
@@ -202,6 +270,11 @@ public class ShipController : MonoBehaviour
         }
 
         return mouseOffset;
+    }
+
+    private bool IsLookInputSuppressed()
+    {
+        return Time.unscaledTime < suppressLookInputUntil;
     }
 
     private void ApplyRotation(Vector2 rotationInput)
@@ -433,6 +506,108 @@ public class ShipController : MonoBehaviour
         useFloatingOrigin = isEnabled;
     }
 
+    public void SetHyperCruiseOverrideActive(bool isActive, bool clearVelocity = false)
+    {
+        hyperCruiseOverrideActive = isActive;
+        moveInput = Vector2.zero;
+        thrustInput = 0f;
+        yawInput = 0f;
+        SetNavigationLockDirection(false, Vector3.zero);
+
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb == null)
+        {
+            return;
+        }
+
+        rb.angularVelocity = Vector3.zero;
+        if (isActive && clearVelocity)
+        {
+            desiredThrust = 0f;
+            actualThrust = 0f;
+            rb.linearVelocity = Vector3.zero;
+        }
+    }
+
+    public void RotateHyperCruiseTowards(Vector3 forwardDirection, float maxDegreesDelta)
+    {
+        if (forwardDirection.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        Vector3 direction = forwardDirection.normalized;
+        Quaternion currentRotation = rb != null ? rb.rotation : transform.rotation;
+        Quaternion targetRotation = rb != null && lockPreservesCurrentRoll
+            ? GetRollPreservingTargetRotation(direction)
+            : Quaternion.LookRotation(direction, Vector3.up);
+        Quaternion nextRotation = Quaternion.RotateTowards(currentRotation, targetRotation, Mathf.Max(0f, maxDegreesDelta));
+
+        if (rb != null)
+        {
+            rb.rotation = nextRotation;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        transform.rotation = nextRotation;
+    }
+
+    public void SetHyperCruiseRotation(Quaternion rotation)
+    {
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb != null)
+        {
+            rb.rotation = rotation;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        transform.rotation = rotation;
+    }
+
+    public void StabilizeHyperCruiseArrival(Vector3 forwardDirection, float thrust, float lookSuppressionDuration = 1.25f)
+    {
+        if (forwardDirection.sqrMagnitude < 0.0001f)
+        {
+            forwardDirection = transform.forward;
+        }
+
+        moveInput = Vector2.zero;
+        thrustInput = 0f;
+        yawInput = 0f;
+        SuppressLookInput(lookSuppressionDuration);
+        SetNavigationLockDirection(false, Vector3.zero);
+        RotateHyperCruiseTowards(forwardDirection, 180f);
+
+        desiredThrust = Mathf.Clamp(thrust, -30f, 70f);
+        actualThrust = desiredThrust;
+        actualThrustChangeRate = 0f;
+        isActuallyAccelerating = false;
+
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb != null)
+        {
+            rb.linearVelocity = transform.forward * (actualThrust * thrustForce);
+            rb.angularVelocity = Vector3.zero;
+        }
+    }
+
     public void RecenterForHyperCruise(Vector3 originOffset)
     {
         if (originOffset.sqrMagnitude < 0.0001f)
@@ -459,7 +634,7 @@ public class ShipController : MonoBehaviour
         }
     }
 
-    public void MoveHyperCruisePosition(Vector3 worldPosition, Vector3 lockDirection, float thrust)
+    public void MoveHyperCruisePosition(Vector3 worldPosition, Vector3 travelDirection, float thrust)
     {
         desiredThrust = Mathf.Clamp(thrust, -30f, 70f);
         actualThrust = desiredThrust;
@@ -469,10 +644,9 @@ public class ShipController : MonoBehaviour
             rb = GetComponent<Rigidbody>();
         }
 
-        Vector3 velocityDirection = lockDirection.sqrMagnitude > 0.0001f
-            ? lockDirection.normalized
+        Vector3 velocityDirection = travelDirection.sqrMagnitude > 0.0001f
+            ? travelDirection.normalized
             : transform.forward;
-        SetNavigationLockDirection(velocityDirection.sqrMagnitude > 0.0001f, velocityDirection);
 
         if (rb != null)
         {

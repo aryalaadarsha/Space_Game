@@ -16,6 +16,7 @@ public class HyperDriveManager : MonoBehaviour
         public string sceneName = "Earth";
         public string targetObjectName = "Earth";
         public Vector3 galacticCoordinates;
+        public Vector3 solarSystemPositionAu;
         public Color accentColor = new Color(1f, 0.48f, 0.04f, 1f);
         public bool enabled = true;
     }
@@ -23,6 +24,8 @@ public class HyperDriveManager : MonoBehaviour
     [Header("Destinations")]
     [SerializeField] private List<HyperCruiseDestination> destinations = new List<HyperCruiseDestination>();
     [SerializeField] private Vector3 currentGalacticCoordinates;
+    [SerializeField] private Vector3 currentSolarSystemPositionAu = new Vector3(1f, 0f, 0f);
+    [SerializeField] private float localDestinationDistanceAu = 0.01f;
 
     [Header("Warp Gauge")]
     [SerializeField] private float maximumWarpGauge = 100f;
@@ -30,6 +33,7 @@ public class HyperDriveManager : MonoBehaviour
     [SerializeField] private float warpRechargeRate = 2.5f;
     [SerializeField] private float baseWarpCost = 16f;
     [SerializeField] private float costPerCoordinateUnit = 0.62f;
+    [SerializeField] private float costPerAstronomicalUnit = 6f;
     [SerializeField] private float maximumWarpCost = 96f;
 
     [Header("HUD")]
@@ -42,8 +46,16 @@ public class HyperDriveManager : MonoBehaviour
     [SerializeField] private float departureDistortionDuration = 4f;
     [SerializeField] private float arrivalDistortionDuration = 4f;
     [SerializeField] private float hyperCruiseThrust = 70f;
+    [SerializeField] private float arrivalExitThrust = 0f;
+    [SerializeField] private float arrivalLookSuppressionDuration = 1.25f;
+    [SerializeField] private float turnTowardTargetSpeed = 85f;
+    [SerializeField] private float turnCompletionAngle = 2f;
+    [SerializeField] private float minimumTurnDuration = 0.75f;
+    [SerializeField] private float maximumTurnDuration = 3f;
+    [SerializeField] private float arrivalDisplayedDistanceKilometers = 50000f;
     [SerializeField] private float arrivalDistanceFromTarget = 120f;
     [SerializeField] private float arrivalRadiusMultiplier = 2.35f;
+    [SerializeField] private bool ignoreDestinationCollisionOnArrival = true;
     [SerializeField] private string farSpaceLayerName = "FarSpace";
     [SerializeField] private string trackingTargetTag = "TrackingObject";
 
@@ -157,11 +169,16 @@ public class HyperDriveManager : MonoBehaviour
         TargetingManager targetingManager = FindFirstObjectByType<TargetingManager>();
         if (targetingManager != null)
         {
-            targetingManager.LockTarget(target, true);
+            targetingManager.UnlockTarget();
         }
 
         bool restoreFloatingOrigin = shipController.UseFloatingOrigin;
+        shipController.SetHyperCruiseOverrideActive(true, true);
+        SetStatus("ALIGNING VECTOR", NeonBlue);
+        yield return TurnShipTowardDestination(shipController, target);
+
         shipController.SetFloatingOriginEnabled(false);
+        SetStatus("HYPER CRUISE JUMP", NeonBlue);
 
         float currentIntensity = GetLensDistortionIntensity(normalLensDistortionIntensity);
         yield return AnimateLensDistortionAndMove(
@@ -179,8 +196,16 @@ public class HyperDriveManager : MonoBehaviour
         }
 
         currentGalacticCoordinates = destination.galacticCoordinates;
+        currentSolarSystemPositionAu = GetSolarSystemPositionAu(destination);
         SelectFirstRemoteDestination();
         yield return AnimateLensDistortion(hyperCruiseLensDistortionIntensity, normalLensDistortionIntensity, arrivalDistortionDuration);
+        if (targetingManager != null)
+        {
+            targetingManager.UnlockTarget();
+        }
+
+        StabilizeArrivalView(shipController, target);
+        shipController.SetHyperCruiseOverrideActive(false);
         isJumping = false;
         SetStatus("HYPER CRUISE READY", NeonOrange);
         RefreshHud();
@@ -199,6 +224,7 @@ public class HyperDriveManager : MonoBehaviour
             sceneName = "Earth",
             targetObjectName = "Earth",
             galacticCoordinates = new Vector3(0f, 0f, 0f),
+            solarSystemPositionAu = new Vector3(1f, 0f, 0f),
             accentColor = new Color(0.12f, 0.78f, 1f, 1f)
         });
         destinations.Add(new HyperCruiseDestination
@@ -207,6 +233,7 @@ public class HyperDriveManager : MonoBehaviour
             sceneName = "Saturn",
             targetObjectName = "Saturn",
             galacticCoordinates = new Vector3(74f, 8f, 39f),
+            solarSystemPositionAu = new Vector3(9.58f, 0f, 0f),
             accentColor = new Color(1f, 0.55f, 0.08f, 1f)
         });
     }
@@ -236,6 +263,7 @@ public class HyperDriveManager : MonoBehaviour
         if (nearestDestination != null && bestDistance <= GetLocalOrbitDistance(nearestDestination))
         {
             currentGalacticCoordinates = nearestDestination.galacticCoordinates;
+            currentSolarSystemPositionAu = GetSolarSystemPositionAu(nearestDestination);
         }
     }
 
@@ -268,19 +296,58 @@ public class HyperDriveManager : MonoBehaviour
 
     private bool IsLocalDestination(HyperCruiseDestination destination)
     {
-        Transform target = FindDestinationTarget(destination);
-        return target != null && GetNavigationDistanceToTarget(target) <= GetLocalOrbitDistance(destination);
+        return destination != null && GetDistanceAu(destination) <= Mathf.Max(0.000001f, localDestinationDistanceAu);
     }
 
     private float GetWarpCost(HyperCruiseDestination destination)
     {
-        float distance = Vector3.Distance(currentGalacticCoordinates, destination.galacticCoordinates);
-        return Mathf.Clamp(baseWarpCost + distance * costPerCoordinateUnit, 0f, maximumWarpCost);
+        float distanceAu = GetDistanceAu(destination);
+        float costPerUnit = costPerAstronomicalUnit > 0.0001f ? costPerAstronomicalUnit : costPerCoordinateUnit;
+        return Mathf.Clamp(baseWarpCost + distanceAu * costPerUnit, 0f, maximumWarpCost);
     }
 
     private float GetDistance(HyperCruiseDestination destination)
     {
-        return Vector3.Distance(currentGalacticCoordinates, destination.galacticCoordinates);
+        return GetDistanceAu(destination);
+    }
+
+    private float GetDistanceAu(HyperCruiseDestination destination)
+    {
+        return Vector3.Distance(currentSolarSystemPositionAu, GetSolarSystemPositionAu(destination));
+    }
+
+    private double GetDistanceKilometers(HyperCruiseDestination destination)
+    {
+        return GetDistanceAu(destination) * SpaceDistanceUtility.KilometersPerAstronomicalUnit;
+    }
+
+    private Vector3 GetSolarSystemPositionAu(HyperCruiseDestination destination)
+    {
+        if (destination == null)
+        {
+            return currentSolarSystemPositionAu;
+        }
+
+        if (destination.solarSystemPositionAu.sqrMagnitude > 0.0001f)
+        {
+            return destination.solarSystemPositionAu;
+        }
+
+        string normalizedName = NormalizeDestinationName(destination.destinationName);
+        if (normalizedName == "EARTH")
+        {
+            return new Vector3(1f, 0f, 0f);
+        }
+
+        if (normalizedName == "SATURN")
+        {
+            return new Vector3(9.58f, 0f, 0f);
+        }
+
+        float legacyDistance = destination.galacticCoordinates.magnitude;
+        return legacyDistance > 0.0001f
+            ? new Vector3(legacyDistance, 0f, 0f)
+            : Vector3.zero;
     }
 
     private void SelectDestination(int index)
@@ -504,10 +571,9 @@ public class HyperDriveManager : MonoBehaviour
         if (TryGetSelectedDestination(out HyperCruiseDestination selected))
         {
             float cost = GetWarpCost(selected);
-            float distance = GetDistance(selected);
             if (selectedInfoText != null)
             {
-                selectedInfoText.text = $"{distance:0.0} LY  /  {cost:0} WG";
+                selectedInfoText.text = $"{SpaceDistanceUtility.FormatKilometers(GetDistanceKilometers(selected))}  /  {cost:0} WG";
             }
 
             if (warpGaugeText != null)
@@ -531,7 +597,7 @@ public class HyperDriveManager : MonoBehaviour
 
             destinationButtons[i].interactable = destination.enabled && !isJumping && !isLocal;
             destinationLabels[i].text = destination.destinationName;
-            destinationMetaLabels[i].text = isLocal ? "LOCAL" : $"{GetDistance(destination):0.0} LY";
+            destinationMetaLabels[i].text = isLocal ? "LOCAL" : SpaceDistanceUtility.FormatKilometers(GetDistanceKilometers(destination));
 
             Color labelColor = isSelected ? Color.Lerp(NeonOrange, Color.white, 0.22f) : NeonOrange;
             if (!canAfford && !isLocal)
@@ -542,6 +608,24 @@ public class HyperDriveManager : MonoBehaviour
             destinationLabels[i].color = labelColor;
             destinationMetaLabels[i].color = isSelected ? NeonBlue : labelColor;
         }
+    }
+
+    public bool TryGetAstronomicalDistanceToTarget(Transform target, out double kilometers)
+    {
+        kilometers = 0.0;
+        if (target == null)
+        {
+            return false;
+        }
+
+        HyperCruiseDestination destination = FindDestinationForTarget(target);
+        if (destination == null || IsLocalDestination(destination))
+        {
+            return false;
+        }
+
+        kilometers = GetDistanceKilometers(destination);
+        return kilometers > 0.0;
     }
 
     private void SetStatus(string status, Color color)
@@ -555,6 +639,86 @@ public class HyperDriveManager : MonoBehaviour
         warpStatusText.color = color;
     }
 
+    private IEnumerator TurnShipTowardDestination(ShipController shipController, Transform target)
+    {
+        if (shipController == null || target == null)
+        {
+            yield break;
+        }
+
+        Vector3 directionToTarget = GetDirectionToTarget(shipController.transform.position, target);
+        if (directionToTarget.sqrMagnitude < 0.0001f)
+        {
+            yield break;
+        }
+
+        Quaternion startRotation = shipController.transform.rotation;
+        Quaternion targetRotation = GetRollPreservingRotation(startRotation, directionToTarget);
+        float angleToTarget = Quaternion.Angle(startRotation, targetRotation);
+        if (angleToTarget <= turnCompletionAngle)
+        {
+            shipController.SetHyperCruiseRotation(targetRotation);
+            yield break;
+        }
+
+        float durationFromSpeed = angleToTarget / Mathf.Max(0.001f, turnTowardTargetSpeed);
+        float duration = Mathf.Clamp(durationFromSpeed, Mathf.Max(0.01f, minimumTurnDuration), Mathf.Max(0.01f, maximumTurnDuration));
+        float elapsed = 0f;
+
+        while (elapsed < duration && shipController != null && target != null)
+        {
+            directionToTarget = GetDirectionToTarget(shipController.transform.position, target);
+            if (directionToTarget.sqrMagnitude < 0.0001f)
+            {
+                yield break;
+            }
+
+            targetRotation = GetRollPreservingRotation(startRotation, directionToTarget);
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float easedT = SmootherStep(t);
+            shipController.SetHyperCruiseRotation(Quaternion.Slerp(startRotation, targetRotation, easedT));
+
+            yield return null;
+        }
+
+        if (shipController != null && target != null)
+        {
+            directionToTarget = GetDirectionToTarget(shipController.transform.position, target);
+            if (directionToTarget.sqrMagnitude > 0.0001f)
+            {
+                shipController.SetHyperCruiseRotation(GetRollPreservingRotation(shipController.transform.rotation, directionToTarget));
+            }
+        }
+    }
+
+    private Quaternion GetRollPreservingRotation(Quaternion currentRotation, Vector3 forwardDirection)
+    {
+        Vector3 direction = forwardDirection.sqrMagnitude > 0.0001f
+            ? forwardDirection.normalized
+            : currentRotation * Vector3.forward;
+        Vector3 currentUp = currentRotation * Vector3.up;
+        Vector3 targetUp = Vector3.ProjectOnPlane(currentUp, direction);
+
+        if (targetUp.sqrMagnitude < 0.0001f)
+        {
+            targetUp = Vector3.ProjectOnPlane(currentRotation * Vector3.right, direction);
+        }
+
+        if (targetUp.sqrMagnitude < 0.0001f)
+        {
+            targetUp = Vector3.ProjectOnPlane(Vector3.up, direction);
+        }
+
+        return Quaternion.LookRotation(direction, targetUp.sqrMagnitude > 0.0001f ? targetUp.normalized : Vector3.up);
+    }
+
+    private float SmootherStep(float t)
+    {
+        t = Mathf.Clamp01(t);
+        return t * t * t * (t * (t * 6f - 15f) + 10f);
+    }
+
     private IEnumerator AnimateLensDistortionAndMove(
         float fromIntensity,
         float toIntensity,
@@ -565,7 +729,6 @@ public class HyperDriveManager : MonoBehaviour
         if (duration <= 0f)
         {
             SetLensDistortionIntensity(toIntensity);
-            MoveShipNearDestination(shipController, target);
             yield break;
         }
 
@@ -579,9 +742,9 @@ public class HyperDriveManager : MonoBehaviour
             float easedT = Mathf.SmoothStep(0f, 1f, t);
             Vector3 destinationPosition = GetShipArrivalWorldPosition(shipController.transform.position, target);
             Vector3 nextPosition = Vector3.Lerp(startPosition, destinationPosition, easedT);
-            Vector3 lockDirection = GetDirectionToTarget(shipController.transform.position, target);
+            Vector3 travelDirection = GetDirectionToTarget(shipController.transform.position, target);
 
-            shipController.MoveHyperCruisePosition(nextPosition, lockDirection, hyperCruiseThrust);
+            shipController.MoveHyperCruisePosition(nextPosition, travelDirection, hyperCruiseThrust);
             SetLensDistortionIntensity(Mathf.Lerp(fromIntensity, toIntensity, easedT));
             yield return null;
         }
@@ -597,8 +760,60 @@ public class HyperDriveManager : MonoBehaviour
         }
 
         ShiftDestinationWorldNearShip(shipController, target);
-        Vector3 lockDirection = GetDirectionToTarget(Vector3.zero, target);
-        shipController.MoveHyperCruisePosition(Vector3.zero, lockDirection, hyperCruiseThrust);
+        IgnoreShipCollisionWithDestination(shipController, target);
+        Vector3 travelDirection = GetDirectionToTarget(Vector3.zero, target);
+        shipController.MoveHyperCruisePosition(Vector3.zero, travelDirection, hyperCruiseThrust);
+        shipController.StabilizeHyperCruiseArrival(travelDirection, arrivalExitThrust, arrivalLookSuppressionDuration);
+        Physics.SyncTransforms();
+    }
+
+    private void StabilizeArrivalView(ShipController shipController, Transform target)
+    {
+        if (shipController == null)
+        {
+            return;
+        }
+
+        Vector3 travelDirection = target != null
+            ? GetDirectionToTarget(shipController.transform.position, target)
+            : shipController.transform.forward;
+        shipController.StabilizeHyperCruiseArrival(travelDirection, arrivalExitThrust, arrivalLookSuppressionDuration);
+
+        CameraManager cameraManager = FindFirstObjectByType<CameraManager>();
+        if (cameraManager != null)
+        {
+            cameraManager.ResetMotionEffects();
+        }
+    }
+
+    private void IgnoreShipCollisionWithDestination(ShipController shipController, Transform target)
+    {
+        if (!ignoreDestinationCollisionOnArrival || shipController == null || target == null)
+        {
+            return;
+        }
+
+        Collider[] shipColliders = shipController.transform.root.GetComponentsInChildren<Collider>(true);
+        Collider[] destinationColliders = target.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < shipColliders.Length; i++)
+        {
+            Collider shipCollider = shipColliders[i];
+            if (shipCollider == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < destinationColliders.Length; j++)
+            {
+                Collider destinationCollider = destinationColliders[j];
+                if (destinationCollider == null || destinationCollider == shipCollider)
+                {
+                    continue;
+                }
+
+                Physics.IgnoreCollision(shipCollider, destinationCollider, true);
+            }
+        }
     }
 
     private void ShiftDestinationWorldNearShip(ShipController shipController, Transform target)
@@ -723,6 +938,39 @@ public class HyperDriveManager : MonoBehaviour
         }
 
         return FindAnyTransformByDestinationName(destination);
+    }
+
+    private HyperCruiseDestination FindDestinationForTarget(Transform target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < destinations.Count; i++)
+        {
+            HyperCruiseDestination destination = destinations[i];
+            if (destination == null)
+            {
+                continue;
+            }
+
+            Transform destinationTarget = FindDestinationTarget(destination);
+            if (destinationTarget == null)
+            {
+                continue;
+            }
+
+            if (target == destinationTarget
+                || target.IsChildOf(destinationTarget)
+                || destinationTarget.IsChildOf(target)
+                || IsDestinationNameMatch(target.name, destination))
+            {
+                return destination;
+            }
+        }
+
+        return null;
     }
 
     private Transform FindTargetByExactName(string targetName)
@@ -863,8 +1111,21 @@ public class HyperDriveManager : MonoBehaviour
 
     private float GetArrivalOffset(Transform target)
     {
+        if (arrivalDisplayedDistanceKilometers > 0f)
+        {
+            return GetArrivalOffsetForDisplayedKilometers(target, arrivalDisplayedDistanceKilometers);
+        }
+
         float targetRadius = EstimateTargetRadius(target);
         return Mathf.Max(arrivalDistanceFromTarget, targetRadius * arrivalRadiusMultiplier);
+    }
+
+    private float GetArrivalOffsetForDisplayedKilometers(Transform target, float displayedKilometers)
+    {
+        float distance = Mathf.Max(0f, displayedKilometers);
+        return IsFarSpaceTarget(target)
+            ? distance * Mathf.Max(0.0001f, GetFarSpaceMovementScale())
+            : distance;
     }
 
     private Vector3 GetTargetPoint(Transform target)
@@ -899,7 +1160,7 @@ public class HyperDriveManager : MonoBehaviour
         Renderer[] renderers = target.GetComponentsInChildren<Renderer>();
         for (int i = 0; i < renderers.Length; i++)
         {
-            if (renderers[i] == null)
+            if (renderers[i] == null || renderers[i] is ParticleSystemRenderer)
             {
                 continue;
             }

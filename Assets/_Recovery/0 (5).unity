@@ -7103,14 +7103,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HyperDrive
   destinations: []
   currentGalacticCoordinates: {x: 0, y: 0, z: 0}
-  currentSolarSystemPositionAu: {x: 1, y: 0, z: 0}
-  localDestinationDistanceAu: 0.01
   maximumWarpGauge: 100
   startingWarpGauge: 72
   warpRechargeRate: 7.5
   baseWarpCost: 16
   costPerCoordinateUnit: 0.62
-  costPerAstronomicalUnit: 6
   maximumWarpCost: 96
   createHudOnStart: 1
   hudSortingOrder: 280
@@ -7119,16 +7116,8 @@ MonoBehaviour:
   departureDistortionDuration: 4
   arrivalDistortionDuration: 4
   hyperCruiseThrust: 70
-  arrivalExitThrust: 0
-  arrivalLookSuppressionDuration: 1.25
-  turnTowardTargetSpeed: 85
-  turnCompletionAngle: 2
-  minimumTurnDuration: 0.75
-  maximumTurnDuration: 3
-  arrivalDisplayedDistanceKilometers: 50000
   arrivalDistanceFromTarget: 120
   arrivalRadiusMultiplier: 2.35
-  ignoreDestinationCollisionOnArrival: 1
   farSpaceLayerName: FarSpace
   trackingTargetTag: TrackingObject
 --- !u!1 &1001032970
@@ -7810,7 +7799,6 @@ MonoBehaviour:
   targetRefreshInterval: 0.5
   targetColor: {r: 1, g: 0.45, b: 0.05, a: 0.95}
   lockedColor: {r: 1, g: 0.78, b: 0.16, a: 1}
-  localKilometersPerDisplayedKilometer: 1000
 --- !u!1 &1012171218
 GameObject:
   m_ObjectHideFlags: 0
@@ -8280,29 +8268,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 4722043230312665952, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LODs.Array.data[0].screenRelativeHeight
-      value: 0.009701546
-      objectReference: {fileID: 0}
-    - target: {fileID: 4722043230312665952, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LODs.Array.data[1].screenRelativeHeight
-      value: 0.0019362519
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 500
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 500
-      objectReference: {fileID: 0}
-    - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 500
-      objectReference: {fileID: 0}
     - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 51031
+      value: 34186.16
       objectReference: {fileID: 0}
     - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
       propertyPath: m_LocalPosition.y
@@ -8310,7 +8278,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -58924
+      value: -30344.336
       objectReference: {fileID: 0}
     - target: {fileID: 5939222521244726060, guid: 17b085df9d6d24b41b65d9fb9b886565, type: 3}
       propertyPath: m_LocalRotation.w

@@ -19,6 +19,7 @@ public class TargetingManager : MonoBehaviour
     [Header("HUD")]
     [SerializeField] private Color targetColor = new Color(1f, 0.45f, 0.05f, 0.95f);
     [SerializeField] private Color lockedColor = new Color(1f, 0.78f, 0.16f, 1f);
+    [SerializeField] private float localKilometersPerDisplayedKilometer = 1000f;
 
     private readonly List<Transform> targetCandidates = new List<Transform>();
     private Transform currentTarget;
@@ -35,6 +36,7 @@ public class TargetingManager : MonoBehaviour
     private TMP_Text lockText;
     private CanvasGroup indicatorGroup;
     private FarSpaceCameraSync farSpaceSync;
+    private HyperDriveManager hyperDriveManager;
 
     public Transform CurrentTarget => currentTarget;
     public Transform LockedTarget => lockedTarget;
@@ -58,6 +60,7 @@ public class TargetingManager : MonoBehaviour
         }
 
         UpdateFarSpaceSyncReference();
+        UpdateHyperDriveReference();
     }
 
     private void Awake()
@@ -163,6 +166,7 @@ public class TargetingManager : MonoBehaviour
         }
 
         UpdateFarSpaceSyncReference();
+        UpdateHyperDriveReference();
     }
 
     private Camera FindUnifiedViewingCamera()
@@ -183,6 +187,14 @@ public class TargetingManager : MonoBehaviour
     private void UpdateFarSpaceSyncReference()
     {
         farSpaceSync = targetCamera != null ? targetCamera.GetComponent<FarSpaceCameraSync>() : null;
+    }
+
+    private void UpdateHyperDriveReference()
+    {
+        if (hyperDriveManager == null)
+        {
+            hyperDriveManager = FindFirstObjectByType<HyperDriveManager>();
+        }
     }
 
     private void RefreshTargetsIfNeeded()
@@ -317,7 +329,7 @@ public class TargetingManager : MonoBehaviour
         Renderer[] renderers = target.GetComponentsInChildren<Renderer>();
         foreach (Renderer renderer in renderers)
         {
-            if (renderer == null)
+            if (renderer == null || renderer is ParticleSystemRenderer)
             {
                 continue;
             }
@@ -378,7 +390,7 @@ public class TargetingManager : MonoBehaviour
         Renderer[] renderers = target.GetComponentsInChildren<Renderer>();
         foreach (Renderer renderer in renderers)
         {
-            if (renderer == null)
+            if (renderer == null || renderer is ParticleSystemRenderer)
             {
                 continue;
             }
@@ -520,7 +532,7 @@ public class TargetingManager : MonoBehaviour
         indicatorRoot.localScale = Vector3.one * pulse;
 
         nameText.text = target.name.ToUpperInvariant();
-        distanceText.text = FormatDistance(GetNavigationDistance(targetPoint));
+        distanceText.text = FormatDistance(target, GetNavigationDistance(targetPoint));
         lockText.text = IsLocked ? "LOCKED" : string.Empty;
 
         float margin = 70f;
@@ -534,14 +546,17 @@ public class TargetingManager : MonoBehaviour
         indicatorGroup.alpha = IsLocked ? 1f : 0.88f;
     }
 
-    private string FormatDistance(float distance)
+    private string FormatDistance(Transform target, float navigationDistance)
     {
-        if (distance >= 1000f)
+        if (hyperDriveManager != null
+            && hyperDriveManager.TryGetAstronomicalDistanceToTarget(target, out double astronomicalKilometers))
         {
-            return $"{distance / 1000f:0.0} km";
+            return SpaceDistanceUtility.FormatKilometers(astronomicalKilometers);
         }
 
-        return $"{distance:0} m";
+        double displayedKilometers = Mathf.Max(0f, navigationDistance) / 1000.0;
+        double scaledKilometers = displayedKilometers * Mathf.Max(1f, localKilometersPerDisplayedKilometer);
+        return SpaceDistanceUtility.FormatKilometers(scaledKilometers);
     }
 
     private float GetNavigationDistance(Vector3 targetPoint)

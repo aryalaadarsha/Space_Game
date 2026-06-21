@@ -90,6 +90,17 @@ public class CameraManager : MonoBehaviour
         transform.localPosition = baseLocalPosition + cameraLookOffset;
     }
 
+    public void ResetMotionEffects()
+    {
+        StopShake();
+        isBrowsing = false;
+        cameraLookOffset = Vector3.zero;
+        targetCameraLookOffset = Vector3.zero;
+        targetLocalRotation = baseLocalRotationQ;
+        transform.localPosition = baseLocalPosition;
+        transform.localRotation = baseLocalRotationQ;
+    }
+
     public void StartBrowse()
     {
         isBrowsing = true;
