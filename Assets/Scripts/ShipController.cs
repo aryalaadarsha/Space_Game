@@ -425,4 +425,20 @@ public class ShipController : MonoBehaviour
     {
         thrustForce *= amount;
     }
+
+    public void ApplyHyperCruiseBoost(float thrust)
+    {
+        desiredThrust = Mathf.Clamp(thrust, -30f, 70f);
+        actualThrust = desiredThrust;
+
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb != null)
+        {
+            rb.linearVelocity = transform.forward * (actualThrust * thrustForce);
+        }
+    }
 }

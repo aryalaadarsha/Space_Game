@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -10,8 +12,8 @@ public class HyperDriveManager : MonoBehaviour
     [System.Serializable]
     public class HyperCruiseDestination
     {
-        public string destinationName = "EARTH ORBIT";
-        public string sceneName = "SampleScene";
+        public string destinationName = "EARTH";
+        public string sceneName = "Earth";
         public Vector3 galacticCoordinates;
         public Color accentColor = new Color(1f, 0.48f, 0.04f, 1f);
         public bool enabled = true;
@@ -24,19 +26,21 @@ public class HyperDriveManager : MonoBehaviour
     [Header("Warp Gauge")]
     [SerializeField] private float maximumWarpGauge = 100f;
     [SerializeField] private float startingWarpGauge = 72f;
-    [SerializeField] private float warpRechargeRate = 7.5f;
+    [SerializeField] private float warpRechargeRate = 2.5f;
     [SerializeField] private float baseWarpCost = 16f;
     [SerializeField] private float costPerCoordinateUnit = 0.62f;
     [SerializeField] private float maximumWarpCost = 96f;
 
-    [Header("Jump Timing")]
-    [SerializeField] private float gaugeDrainDuration = 1.05f;
-    [SerializeField] private float hyperspaceDuration = 2.2f;
-    [SerializeField] private float sceneLoadDelay = 0.18f;
-
     [Header("HUD")]
     [SerializeField] private bool createHudOnStart = true;
     [SerializeField] private int hudSortingOrder = 280;
+
+    [Header("Hyper Cruise Transition")]
+    [SerializeField] private float normalLensDistortionIntensity = -0.2f;
+    [SerializeField] private float hyperCruiseLensDistortionIntensity = -0.78f;
+    [SerializeField] private float departureDistortionDuration = 4f;
+    [SerializeField] private float arrivalDistortionDuration = 4f;
+    [SerializeField] private float hyperCruiseThrust = 70f;
 
     private readonly List<Button> destinationButtons = new List<Button>();
     private readonly List<TMP_Text> destinationLabels = new List<TMP_Text>();
@@ -55,13 +59,15 @@ public class HyperDriveManager : MonoBehaviour
     private Image warpFillImage;
     private TMP_Text warpGaugeText;
     private TMP_Text warpStatusText;
-    private CanvasGroup jumpOverlayGroup;
-    private HyperspaceJumpGraphic jumpGraphic;
 
     private static readonly Color NeonOrange = new Color(1f, 0.43f, 0.02f, 1f);
     private static readonly Color DimOrange = new Color(1f, 0.24f, 0f, 0.36f);
     private static readonly Color NeonBlue = new Color(0.05f, 0.78f, 1f, 1f);
     private static readonly Color PanelDark = new Color(0.035f, 0.018f, 0.006f, 0.72f);
+
+    private static bool pendingArrivalTransition;
+    private static float arrivalLensDistortionIntensity = -0.2f;
+    private static float arrivalHyperCruiseThrust = 70f;
 
     public float WarpGauge01 => maximumWarpGauge > 0f ? Mathf.Clamp01(currentWarpGauge / maximumWarpGauge) : 0f;
     public bool IsJumping => isJumping;
@@ -86,6 +92,19 @@ public class HyperDriveManager : MonoBehaviour
     {
         RefreshCurrentLocationFromScene(SceneManager.GetActiveScene().name);
         SelectFirstRemoteDestination();
+        ConfigureOutsideOnlyPostProcessing();
+
+        if (pendingArrivalTransition)
+        {
+            pendingArrivalTransition = false;
+            SetLensDistortionIntensity(arrivalLensDistortionIntensity);
+            ApplyHyperCruiseSpeed(arrivalHyperCruiseThrust);
+            StartCoroutine(RecoverFromHyperCruiseArrival());
+        }
+        else
+        {
+            SetLensDistortionIntensity(normalLensDistortionIntensity);
+        }
 
         if (createHudOnStart)
         {
@@ -129,63 +148,51 @@ public class HyperDriveManager : MonoBehaviour
             return false;
         }
 
-        StartCoroutine(RunHyperCruise(destination, cost));
+        StartCoroutine(RunHyperCruiseRoutine(destination, cost));
         return true;
     }
 
-    private IEnumerator RunHyperCruise(HyperCruiseDestination destination, float cost)
+    private IEnumerator RunHyperCruiseRoutine(HyperCruiseDestination destination, float cost)
     {
         isJumping = true;
-        SetStatus("SPOOLING HYPER CRUISE", NeonBlue);
-
-        EnsureHud();
-        float startGauge = currentWarpGauge;
-        float elapsed = 0f;
-
-        while (elapsed < gaugeDrainDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, gaugeDrainDuration));
-            currentWarpGauge = Mathf.Lerp(startGauge, startGauge - cost, SmoothPulse(t));
-            SetJumpOverlay(t * 0.35f);
-            RefreshHud();
-            yield return null;
-        }
-
-        currentWarpGauge = Mathf.Max(0f, startGauge - cost);
-        SetStatus("HYPERSPACE VECTOR LOCKED", NeonBlue);
-
-        elapsed = 0f;
-        while (elapsed < hyperspaceDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, hyperspaceDuration));
-            float intensity = Mathf.Sin(t * Mathf.PI) * 0.35f + Mathf.SmoothStep(0f, 1f, t) * 0.65f;
-            SetJumpOverlay(intensity);
-            yield return null;
-        }
-
-        SetJumpOverlay(1f);
-        yield return new WaitForSeconds(sceneLoadDelay);
+        currentWarpGauge = Mathf.Max(0f, currentWarpGauge - cost);
+        SetStatus("HYPER CRUISE JUMP", NeonBlue);
+        RefreshHud();
+        ConfigureOutsideOnlyPostProcessing();
+        ApplyHyperCruiseSpeed(hyperCruiseThrust);
 
         if (!string.IsNullOrWhiteSpace(destination.sceneName) && Application.CanStreamedLevelBeLoaded(destination.sceneName))
         {
+            float currentIntensity = GetLensDistortionIntensity(normalLensDistortionIntensity);
+            yield return AnimateLensDistortion(currentIntensity, hyperCruiseLensDistortionIntensity, departureDistortionDuration);
+
+            pendingArrivalTransition = true;
+            arrivalLensDistortionIntensity = hyperCruiseLensDistortionIntensity;
+            arrivalHyperCruiseThrust = hyperCruiseThrust;
+#if UNITY_EDITOR
+            ClearEditorVolumeSelectionBeforeSceneLoad();
+#endif
             SceneManager.LoadScene(destination.sceneName);
         }
         else
         {
             Debug.LogWarning($"Hyper Cruise destination scene is not loadable: {destination.sceneName}");
             SetStatus("DESTINATION SCENE OFFLINE", new Color(1f, 0.18f, 0.04f, 1f));
-            SetJumpOverlay(0f);
+            SetLensDistortionIntensity(normalLensDistortionIntensity);
             isJumping = false;
         }
+    }
+
+    private IEnumerator RecoverFromHyperCruiseArrival()
+    {
+        yield return AnimateLensDistortion(arrivalLensDistortionIntensity, normalLensDistortionIntensity, arrivalDistortionDuration);
+        SetStatus("HYPER CRUISE READY", NeonOrange);
     }
 
     private void HandleActiveSceneChanged(Scene previousScene, Scene newScene)
     {
         RefreshCurrentLocationFromScene(newScene.name);
         SelectFirstRemoteDestination();
-        SetJumpOverlay(0f);
         isJumping = false;
         SetStatus("HYPER CRUISE READY", NeonOrange);
     }
@@ -199,24 +206,17 @@ public class HyperDriveManager : MonoBehaviour
 
         destinations.Add(new HyperCruiseDestination
         {
-            destinationName = "EARTH ORBIT",
-            sceneName = "SampleScene",
+            destinationName = "EARTH",
+            sceneName = "Earth",
             galacticCoordinates = new Vector3(0f, 0f, 0f),
             accentColor = new Color(0.12f, 0.78f, 1f, 1f)
         });
         destinations.Add(new HyperCruiseDestination
         {
-            destinationName = "SATURN RING",
-            sceneName = "SampleScene2",
+            destinationName = "SATURN",
+            sceneName = "Saturn",
             galacticCoordinates = new Vector3(74f, 8f, 39f),
             accentColor = new Color(1f, 0.55f, 0.08f, 1f)
-        });
-        destinations.Add(new HyperCruiseDestination
-        {
-            destinationName = "SIRIUS GATE",
-            sceneName = "CruiseScene",
-            galacticCoordinates = new Vector3(-42f, 21f, 96f),
-            accentColor = new Color(0.2f, 0.92f, 1f, 1f)
         });
     }
 
@@ -288,6 +288,12 @@ public class HyperDriveManager : MonoBehaviour
         RefreshHud();
     }
 
+    private void SelectAndStartDestination(int index)
+    {
+        SelectDestination(index);
+        TryStartHyperCruise();
+    }
+
     private void EnsureHud()
     {
         if (hudCanvas != null)
@@ -308,7 +314,6 @@ public class HyperDriveManager : MonoBehaviour
 
         CreateDestinationPanel(canvasObject.transform);
         CreateWarpGauge(canvasObject.transform);
-        CreateJumpOverlay(canvasObject.transform);
     }
 
     private void CreateDestinationPanel(Transform parent)
@@ -360,7 +365,7 @@ public class HyperDriveManager : MonoBehaviour
 
         Button button = buttonObject.GetComponent<Button>();
         int destinationIndex = index;
-        button.onClick.AddListener(() => SelectDestination(destinationIndex));
+        button.onClick.AddListener(() => SelectAndStartDestination(destinationIndex));
         ColorBlock colors = button.colors;
         colors.normalColor = new Color(1f, 0.42f, 0f, 0.2f);
         colors.highlightedColor = new Color(1f, 0.55f, 0.08f, 0.42f);
@@ -430,40 +435,6 @@ public class HyperDriveManager : MonoBehaviour
         warpFillImage.raycastTarget = false;
     }
 
-    private void CreateJumpOverlay(Transform parent)
-    {
-        GameObject overlayObject = new GameObject("Hyperspace Jump Overlay", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
-        overlayObject.transform.SetParent(parent, false);
-
-        RectTransform overlayRect = overlayObject.GetComponent<RectTransform>();
-        overlayRect.anchorMin = Vector2.zero;
-        overlayRect.anchorMax = Vector2.one;
-        overlayRect.offsetMin = Vector2.zero;
-        overlayRect.offsetMax = Vector2.zero;
-        overlayRect.SetAsLastSibling();
-
-        Image shade = overlayObject.GetComponent<Image>();
-        shade.color = new Color(0f, 0.012f, 0.025f, 0.82f);
-        shade.raycastTarget = false;
-
-        jumpOverlayGroup = overlayObject.GetComponent<CanvasGroup>();
-        jumpOverlayGroup.alpha = 0f;
-        jumpOverlayGroup.interactable = false;
-        jumpOverlayGroup.blocksRaycasts = false;
-
-        GameObject streakObject = new GameObject("Star Streaks", typeof(RectTransform), typeof(HyperspaceJumpGraphic));
-        streakObject.transform.SetParent(overlayObject.transform, false);
-        RectTransform streakRect = streakObject.GetComponent<RectTransform>();
-        streakRect.anchorMin = Vector2.zero;
-        streakRect.anchorMax = Vector2.one;
-        streakRect.offsetMin = Vector2.zero;
-        streakRect.offsetMax = Vector2.zero;
-
-        jumpGraphic = streakObject.GetComponent<HyperspaceJumpGraphic>();
-        jumpGraphic.raycastTarget = false;
-        jumpGraphic.color = Color.white;
-    }
-
     private TMP_Text CreateText(Transform parent, string objectName, Vector2 anchoredPosition, Vector2 size, float fontSize, FontStyles fontStyle, TextAlignmentOptions alignment)
     {
         GameObject textObject = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -482,7 +453,7 @@ public class HyperDriveManager : MonoBehaviour
         text.fontStyle = fontStyle;
         text.alignment = alignment;
         text.textWrappingMode = TextWrappingModes.NoWrap;
-        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.overflowMode = TextOverflowModes.Truncate;
         text.color = NeonOrange;
         return text;
     }
@@ -577,21 +548,112 @@ public class HyperDriveManager : MonoBehaviour
         warpStatusText.color = color;
     }
 
-    private void SetJumpOverlay(float intensity)
+    private IEnumerator AnimateLensDistortion(float fromIntensity, float toIntensity, float duration)
     {
-        if (jumpOverlayGroup == null || jumpGraphic == null)
+        if (duration <= 0f)
+        {
+            SetLensDistortionIntensity(toIntensity);
+            yield break;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float easedT = Mathf.SmoothStep(0f, 1f, t);
+            SetLensDistortionIntensity(Mathf.Lerp(fromIntensity, toIntensity, easedT));
+            yield return null;
+        }
+
+        SetLensDistortionIntensity(toIntensity);
+    }
+
+    private void ApplyHyperCruiseSpeed(float thrust)
+    {
+        ShipController shipController = FindFirstObjectByType<ShipController>();
+        if (shipController != null)
+        {
+            shipController.ApplyHyperCruiseBoost(thrust);
+        }
+    }
+
+    private void ConfigureOutsideOnlyPostProcessing()
+    {
+        Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
+        for (int i = 0; i < cameras.Length; i++)
+        {
+            UniversalAdditionalCameraData cameraData = cameras[i].GetComponent<UniversalAdditionalCameraData>();
+            if (cameraData == null)
+            {
+                continue;
+            }
+
+            bool isCockpitOverlay = cameraData.renderType == CameraRenderType.Overlay
+                || cameras[i].name.Contains("Cockpit");
+            cameraData.renderPostProcessing = !isCockpitOverlay;
+        }
+    }
+
+    private float GetLensDistortionIntensity(float fallback)
+    {
+        LensDistortion lensDistortion = FindLensDistortion();
+        return lensDistortion != null ? lensDistortion.intensity.value : fallback;
+    }
+
+    private void SetLensDistortionIntensity(float intensity)
+    {
+        LensDistortion lensDistortion = FindLensDistortion();
+        if (lensDistortion == null)
         {
             return;
         }
 
-        float clamped = Mathf.Clamp01(intensity);
-        jumpOverlayGroup.alpha = clamped;
-        jumpGraphic.SetIntensity(clamped);
+        lensDistortion.active = true;
+        lensDistortion.intensity.overrideState = true;
+        lensDistortion.intensity.value = intensity;
     }
 
-    private static float SmoothPulse(float value)
+    private LensDistortion FindLensDistortion()
     {
-        value = Mathf.Clamp01(value);
-        return value * value * (3f - 2f * value);
+        Volume[] volumes = FindObjectsByType<Volume>(FindObjectsSortMode.None);
+        for (int i = 0; i < volumes.Length; i++)
+        {
+            VolumeProfile profile = GetRuntimeProfile(volumes[i]);
+            if (profile != null && profile.TryGet(out LensDistortion lensDistortion))
+            {
+                return lensDistortion;
+            }
+        }
+
+        return null;
     }
+
+    private VolumeProfile GetRuntimeProfile(Volume volume)
+    {
+        if (volume == null)
+        {
+            return null;
+        }
+
+        return volume.profile != null ? volume.profile : volume.sharedProfile;
+    }
+
+#if UNITY_EDITOR
+    private void ClearEditorVolumeSelectionBeforeSceneLoad()
+    {
+        if (UnityEditor.Selection.activeObject is Volume)
+        {
+            UnityEditor.Selection.activeObject = null;
+            return;
+        }
+
+        GameObject selectedObject = UnityEditor.Selection.activeGameObject;
+        if (selectedObject != null && selectedObject.GetComponent<Volume>() != null)
+        {
+            UnityEditor.Selection.activeObject = null;
+        }
+    }
+#endif
+
 }

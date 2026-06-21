@@ -39,28 +39,42 @@ public class InputManager : MonoBehaviour
         };
     }
 
-    void OnEnable() => controls.Player.Enable();
-    void OnDisable() => controls.Player.Disable();
+    void OnEnable() => controls?.Player.Enable();
+    void OnDisable() => controls?.Player.Disable();
 
 
     void Update()
     {
+        if (controls == null)
+        {
+            return;
+        }
+
+        Keyboard keyboard = Keyboard.current;
+        Mouse mouse = Mouse.current;
+
         inputData.thrustInput = (int) controls.Player.Thrust.ReadValue<float>();
         inputData.strafeInput = controls.Player.Strafe.ReadValue<Vector2>();
         inputData.yawInput = controls.Player.Yaw.ReadValue<float>();
-        inputData.mouseInput = Mouse.current.position.ReadValue();
+        if (mouse != null)
+        {
+            inputData.mouseInput = mouse.position.ReadValue();
+        }
         inputData.toggleWeapon = controls.Player.Toggle_Weapon.triggered;
         inputData.fireLeftWeapon = controls.Player.Attack_Left.IsPressed();
         inputData.fireRightWeapon = controls.Player.Attack_Right.IsPressed();
         inputData.hyperDriveTrigger = controls.Player.HyperDrive.triggered;
-        inputData.targetLockTrigger = Keyboard.current != null && Keyboard.current.lKey.wasPressedThisFrame;
+        inputData.targetLockTrigger = keyboard != null && keyboard.lKey.wasPressedThisFrame;
         
         // 카메라 방향 입력 (Q/E/R/F) - New Input System 사용
         Vector2 cameraLook = Vector2.zero;
-        if (Keyboard.current.qKey.isPressed) cameraLook.x -= 1f;
-        if (Keyboard.current.eKey.isPressed) cameraLook.x += 1f;
-        if (Keyboard.current.rKey.isPressed) cameraLook.y += 1f;
-        if (Keyboard.current.fKey.isPressed) cameraLook.y -= 1f;
+        if (keyboard != null)
+        {
+            if (keyboard.qKey.isPressed) cameraLook.x -= 1f;
+            if (keyboard.eKey.isPressed) cameraLook.x += 1f;
+            if (keyboard.rKey.isPressed) cameraLook.y += 1f;
+            if (keyboard.fKey.isPressed) cameraLook.y -= 1f;
+        }
         inputData.cameraLookInput = cameraLook;
     }
 

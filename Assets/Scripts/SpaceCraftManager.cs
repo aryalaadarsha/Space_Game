@@ -29,8 +29,6 @@ public class SpaceCraftManager : MonoBehaviour
 
         Camera targetCamera = cManager != null ? cManager.GetComponent<Camera>() : GetComponentInChildren<Camera>();
         tManager.Initialize(transform, targetCamera);
-
-        DontDestroyOnLoad(gameObject);
     }
 
     void Update()
