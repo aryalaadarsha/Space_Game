@@ -7214,11 +7214,14 @@ MonoBehaviour:
   warningBeaconScale: 2.25
   warningBeaconSpacing: 3.2
   combatEnemyPrefab: {fileID: 1963689219183679258, guid: 959185ba47727ed419f65ffc497bd2c7, type: 3}
-  combatEnemyCount: 1
-  combatSpawnForwardOffset: 360
-  combatSpawnRightOffset: 120
-  combatSpawnUpOffset: 45
-  combatSpawnSpread: 70
+  combatEnemyCount: 5
+  combatSpawnForwardDistance: 300
+  combatFormationHorizontalSpacing: 53.2
+  combatFormationVerticalSpacing: 49.2
+  combatEnemyDriftSpeed: 4.5
+  combatEnemyDriftSpeedStep: 0.65
+  combatWarningClip: {fileID: 8300000, guid: 0d61c0ddc1b463946bd08b9265ad0635, type: 3}
+  combatWarningVolume: 1
 --- !u!1 &1001032970
 GameObject:
   m_ObjectHideFlags: 0
@@ -15941,7 +15944,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1396970219
 Transform:
   m_ObjectHideFlags: 0

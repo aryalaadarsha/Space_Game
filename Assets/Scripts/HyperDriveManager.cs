@@ -73,11 +73,14 @@ public class HyperDriveManager : MonoBehaviour
 
     [Header("Combat Encounter")]
     [SerializeField] private GameObject combatEnemyPrefab;
-    [SerializeField] private int combatEnemyCount = 1;
-    [SerializeField] private float combatSpawnForwardOffset = 360f;
-    [SerializeField] private float combatSpawnRightOffset = 120f;
-    [SerializeField] private float combatSpawnUpOffset = 45f;
-    [SerializeField] private float combatSpawnSpread = 70f;
+    [SerializeField] private int combatEnemyCount = 5;
+    [SerializeField] private float combatSpawnForwardDistance = 190f;
+    [SerializeField] private float combatFormationHorizontalSpacing = 42f;
+    [SerializeField] private float combatFormationVerticalSpacing = 18f;
+    [SerializeField] private float combatEnemyDriftSpeed = 4.5f;
+    [SerializeField] private float combatEnemyDriftSpeedStep = 0.65f;
+    [SerializeField] private AudioClip combatWarningClip;
+    [SerializeField, Range(0f, 1f)] private float combatWarningVolume = 1f;
 
     private readonly List<Button> destinationButtons = new List<Button>();
     private readonly List<TMP_Text> destinationLabels = new List<TMP_Text>();
@@ -105,6 +108,7 @@ public class HyperDriveManager : MonoBehaviour
     private bool spotLightStateCaptured;
     private readonly List<Renderer> warningBeaconRenderers = new List<Renderer>();
     private Material warningBeaconMaterial;
+    private AudioSource combatWarningAudioSource;
 
     private static readonly Color NeonOrange = new Color(1f, 0.43f, 0.02f, 1f);
     private static readonly Color DimOrange = new Color(1f, 0.24f, 0f, 0.36f);
@@ -759,6 +763,8 @@ public class HyperDriveManager : MonoBehaviour
             return;
         }
 
+        PlayCombatWarningSound();
+
         int spawnCount = Mathf.Max(1, combatEnemyCount);
         for (int i = 0; i < spawnCount; i++)
         {
@@ -783,11 +789,35 @@ public class HyperDriveManager : MonoBehaviour
                 enemy = enemyObject.AddComponent<Enemy>();
             }
 
-            enemy.Initialize(shipController.transform.root);
+            enemy.InitializeSlowDrift(
+                shipController.transform.root,
+                GetCombatDriftDirection(shipController.transform, i, spawnCount),
+                GetCombatDriftSpeed(i));
             enemyObject.SetActive(true);
         }
 
         SetStatus("COMBAT CONTACT", new Color(1f, 0.18f, 0.04f, 1f));
+    }
+
+    private void PlayCombatWarningSound()
+    {
+        if (combatWarningClip == null)
+        {
+            return;
+        }
+
+        if (combatWarningAudioSource == null)
+        {
+            combatWarningAudioSource = gameObject.AddComponent<AudioSource>();
+            combatWarningAudioSource.playOnAwake = false;
+            combatWarningAudioSource.loop = false;
+            combatWarningAudioSource.spatialBlend = 0f;
+        }
+
+        combatWarningAudioSource.Stop();
+        combatWarningAudioSource.pitch = 1f;
+        combatWarningAudioSource.volume = Mathf.Clamp01(combatWarningVolume);
+        combatWarningAudioSource.PlayOneShot(combatWarningClip, Mathf.Clamp01(combatWarningVolume));
     }
 
     private GameObject CreateCombatEnemyObject()
@@ -822,11 +852,28 @@ public class HyperDriveManager : MonoBehaviour
         Vector3 right = shipTransform.right.sqrMagnitude > 0.0001f ? shipTransform.right.normalized : Vector3.right;
         Vector3 up = shipTransform.up.sqrMagnitude > 0.0001f ? shipTransform.up.normalized : Vector3.up;
         float centeredIndex = index - (spawnCount - 1) * 0.5f;
+        float verticalOffset = index == spawnCount / 2
+            ? 0f
+            : (index % 2 == 0 ? 0.5f : -0.5f) * combatFormationVerticalSpacing;
 
         return shipTransform.position
-            + forward * combatSpawnForwardOffset
-            + right * (combatSpawnRightOffset + centeredIndex * combatSpawnSpread)
-            + up * combatSpawnUpOffset;
+            + forward * combatSpawnForwardDistance
+            + right * centeredIndex * combatFormationHorizontalSpacing
+            + up * verticalOffset;
+    }
+
+    private Vector3 GetCombatDriftDirection(Transform shipTransform, int index, int spawnCount)
+    {
+        Vector3 right = shipTransform.right.sqrMagnitude > 0.0001f ? shipTransform.right.normalized : Vector3.right;
+        Vector3 up = shipTransform.up.sqrMagnitude > 0.0001f ? shipTransform.up.normalized : Vector3.up;
+        float centeredIndex = index - (spawnCount - 1) * 0.5f;
+        float side = centeredIndex >= 0f ? 1f : -1f;
+        return (right * side + up * centeredIndex * 0.12f).normalized;
+    }
+
+    private float GetCombatDriftSpeed(int index)
+    {
+        return Mathf.Max(0f, combatEnemyDriftSpeed + (index % 3) * combatEnemyDriftSpeedStep);
     }
 
     private void StartHyperCruiseSpotLightEffect()
