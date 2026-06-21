@@ -12,6 +12,7 @@ public struct InputData
     public bool fireLeftWeapon;
     public bool fireRightWeapon;
     public Vector2 cameraLookInput;
+    public bool targetLockTrigger;
 
     public bool hyperDriveTrigger;
 }

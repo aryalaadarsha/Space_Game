@@ -11,6 +11,7 @@ public class SpaceCraftManager : MonoBehaviour
     public CameraManager cManager;
     public WeaponManager wManager;
     public HyperDriveManager hManager;
+    public TargetingManager tManager;
 
     private MovementData currentMovementData;
     private bool wasBrowsing = false;
@@ -23,6 +24,11 @@ public class SpaceCraftManager : MonoBehaviour
         if (cManager == null)     cManager = GetComponentInChildren<CameraManager>    ();
         if (wManager == null)     wManager = GetComponentInChildren<WeaponManager>    ();
         if (hManager == null)     hManager = GetComponentInChildren<HyperDriveManager>();
+        if (tManager == null)     tManager = GetComponentInChildren<TargetingManager>();
+        if (tManager == null)     tManager = gameObject.AddComponent<TargetingManager>();
+
+        Camera targetCamera = cManager != null ? cManager.GetComponent<Camera>() : GetComponentInChildren<Camera>();
+        tManager.Initialize(transform, targetCamera);
 
         DontDestroyOnLoad(gameObject);
     }
@@ -45,6 +51,7 @@ public class SpaceCraftManager : MonoBehaviour
         HandleToggleWeapon(input);
         HandleFireWeapons(input);
         HandleHyperDrive(input);
+        HandleTargeting(input);
     }
 
     private void HandleToggleWeapon(InputData input)
@@ -115,12 +122,20 @@ public class SpaceCraftManager : MonoBehaviour
         }
     }
 
-    public void OnMovementUpdated(float desiredThrust, float actualThrust, Vector3 velocity, Vector3 angularVelocity)
+    public void OnMovementUpdated(
+        float desiredThrust,
+        float actualThrust,
+        Vector3 velocity,
+        Vector3 angularVelocity,
+        float actualThrustChangeRate,
+        bool isActuallyAccelerating)
     {
         currentMovementData.desiredThrust = desiredThrust;
         currentMovementData.actualThrust = actualThrust;
         currentMovementData.velocity = velocity;
         currentMovementData.angularVelocity = angularVelocity;
+        currentMovementData.actualThrustChangeRate = actualThrustChangeRate;
+        currentMovementData.isActuallyAccelerating = isActuallyAccelerating;
         
         if (sUIManager != null)
         {
@@ -128,7 +143,7 @@ public class SpaceCraftManager : MonoBehaviour
         }
         if (cManager != null)
         {
-            cManager.OnThrustChanged(actualThrust, desiredThrust);
+            cManager.OnThrustChanged(actualThrust, desiredThrust, actualThrustChangeRate, isActuallyAccelerating, angularVelocity);
         }
     }
 
@@ -139,6 +154,32 @@ public class SpaceCraftManager : MonoBehaviour
             OnHyperDriveActivated();
         }
     }
+
+    private void HandleTargeting(InputData input)
+    {
+        if (tManager == null)
+        {
+            return;
+        }
+
+        if (input.targetLockTrigger)
+        {
+            tManager.ToggleLock();
+        }
+
+        if (sController != null)
+        {
+            if (tManager.TryGetLockedDirection(out Vector3 lockDirection))
+            {
+                sController.SetNavigationLockDirection(true, lockDirection);
+            }
+            else
+            {
+                sController.SetNavigationLockDirection(false, Vector3.zero);
+            }
+        }
+    }
+
     private void OnHyperDriveActivated()
     {
         if (hManager != null)
@@ -154,4 +195,6 @@ public struct MovementData
     public float desiredThrust;
     public Vector3 velocity;
     public Vector3 angularVelocity;
+    public float actualThrustChangeRate;
+    public bool isActuallyAccelerating;
 }

@@ -53,6 +53,7 @@ public class InputManager : MonoBehaviour
         inputData.fireLeftWeapon = controls.Player.Attack_Left.IsPressed();
         inputData.fireRightWeapon = controls.Player.Attack_Right.IsPressed();
         inputData.hyperDriveTrigger = controls.Player.HyperDrive.triggered;
+        inputData.targetLockTrigger = Keyboard.current != null && Keyboard.current.lKey.wasPressedThisFrame;
         
         // 카메라 방향 입력 (Q/E/R/F) - New Input System 사용
         Vector2 cameraLook = Vector2.zero;
@@ -69,5 +70,6 @@ public class InputManager : MonoBehaviour
         inputData.stopTrigger = false;
         inputData.toggleWeapon = false;
         inputData.hyperDriveTrigger = false;
+        inputData.targetLockTrigger = false;
     }
 }
